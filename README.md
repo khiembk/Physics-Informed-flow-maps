@@ -46,9 +46,7 @@ We perform a comprehensive experimental comparison of LSD, PSD, and ESD across C
 
 ### Requirements
 - Python 3.9+
-- CUDA 11.8+ or 12.0+ (GPU required for image experiments)
-- 32GB+ GPU memory (recommended for 64×64 images)
-- Linux or macOS
+- CUDA 11.8+ or 12.0+
 
 ### Setup
 
