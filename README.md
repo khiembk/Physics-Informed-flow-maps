@@ -30,17 +30,17 @@ We show that the **tangent condition** -- a simple differential relation between
 
 From our characterizations, we derive three self-distillation methods:
 
-- **Lagrangian Self-Distillation (LSD)** -- An approach that matches the time derivative of the flow map to the underlying implicit flow. The method avoids spatial Jacobians and bootstrapping from small steps during training, leading to high performance and training stability.
-- **Progressive Self-Distillation (PSD)** -- An approach that uses the map itself to bootstrap smaller steps into larger steps. Avoids the use of spatial or temporal derivatives, leading to excellent training stability, but may exhibit distribution shift and compounding errors. Reduces to shortcut models in a particular case.
-- **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing the squared residual on partial differential equation solved by the flow map. Involves both spatial and temporal derivatives, leading to training instability. Reduces to consistency training for consistency models and consistency trajectory models as particular cases.
+- **Lagrangian Self-Distillation (LSD)** -- An approach that matches the time derivative of the flow map to the underlying implicit flow.
+- **Progressive Self-Distillation (PSD)** -- An approach that uses the map itself to bootstrap smaller steps into larger steps. Reduces to shortcut models in a particular case.
+- **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing the squared residual on partial differential equation solved by the flow map. Reduces to consistency training for consistency models and consistency trajectory models as particular cases.
 
 ### 3. Empirical analysis
 
-We perform a comprehensive comparison of LSD, PSD, and ESD across CIFAR-10, CelebA-64, AFHQ-64, and a two-dimensional synthetic dataset. Our findings reveal that:
+We perform a comprehensive experimental comparison of LSD, PSD, and ESD across CIFAR-10, CelebA-64, AFHQ-64, and a two-dimensional synthetic dataset. Our findings reveal that:
 
-- ESD exhibits training instability due to the spatial Jacobian computation, particularly at higher resolutions, necessitating careful training schemes and hyperparameter tuning.
-- PSD trains stably, but suffers from compounding errors that degrade sample quality, leading to reduced performance.
-- LSD exhibits stable training and does not suffer from compounding errors, leading to the highest-quality samples on all problems tried.
+- **ESD** exhibits training instability due to spatial Jacobian and temporal derivative computation, particularly at higher resolutions, necessitating careful training schemes and hyperparameter tuning.
+- **PSD** avoids spatial and temporal derivatives, leading to excellent training stability, but suffers from compounding errors that degrade sample quality and reduce performance.
+- **LSD** avoids spatial Jacobians and bootstrapping from small steps, exhibiting stable training without compounding errors and achieving the highest-quality samples on all problems tried.
 
 ## Installation
 
