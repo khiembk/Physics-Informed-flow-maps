@@ -24,15 +24,15 @@ With this insight in hand, we present three direct training algorithms based on 
 
 ### 1. Unifies the theory of consistency models
 
-We show that the **tangent condition** -- a simple differential relation between the flow map and its underlying velocity field -- yields three equivalent characterizations of the flow map. This approach exposes the full design space of training objectives and clarifies their properties both theoretically and in practice. Existing methods for accelerated generative modeling emerge as particular points in this space (showing, for example, that shortcut models and consistency models estimate the same underlying object).
+We show that the **tangent condition** -- a simple differential relation between the flow map and its underlying velocity field -- yields three equivalent characterizations of the flow map. This approach exposes the full design space of training objectives and clarifies their properties both theoretically and in practice. Existing methods for accelerated generative modeling emerge as particular points in this space, showing, for example, that shortcut models and consistency models estimate the same underlying object.
 
 ### 2. Introduces three training algorithms
 
 From our characterizations, we derive three self-distillation methods:
 
-- **Lagrangian Self-Distillation (LSD)** -- An approach that matches the time derivatives of the flow map to the underlying flow. The method avoids spatial Jacobians and bootstrapping from small steps during training, leading to high performance and training stability.
+- **Lagrangian Self-Distillation (LSD)** -- An approach that matches the time derivative of the flow map to the underlying implicit flow. The method avoids spatial Jacobians and bootstrapping from small steps during training, leading to high performance and training stability.
 - **Progressive Self-Distillation (PSD)** -- An approach that uses the map itself to bootstrap smaller steps into larger steps. Avoids the use of spatial or temporal derivatives, leading to excellent training stability, but may exhibit distribution shift and compounding errors. Reduces to shortcut models in a particular case.
-- **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing a partial differential equation residual. Involves both spatial and temporal derivatives, leading to training instability. Reduces to consistency training for consistency models and consistency trajectory models as particular cases.
+- **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing the squared residual on partial differential equation solved by the flow map. Involves both spatial and temporal derivatives, leading to training instability. Reduces to consistency training for consistency models and consistency trajectory models as particular cases.
 
 ### 3. Empirical analysis
 
