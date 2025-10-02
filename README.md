@@ -174,8 +174,11 @@ flow-maps/
 │   │   ├── logging.py        # Training logging and visualization
 │   │   ├── network_utils.py  # Network initialization helpers
 │   │   └── updates.py        # Optimizer and learning rate schedules
-│   └── launchers/            # Training (learn.py) and eval scripts
-├── notebooks/                # Jupyter notebooks for figure generation
+│   └── launchers/
+│       ├── learn.py                   # Main training script
+│       ├── sample_and_calc_fid.py     # Generate samples and compute FID
+│       └── calc_dataset_fid_stats.py  # Compute dataset statistics for FID
+├── notebooks/                         # Jupyter notebooks for figure generation
 ```
 
 
