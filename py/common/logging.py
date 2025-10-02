@@ -523,11 +523,7 @@ def make_image_plot(
             for jj in range(ncols):
                 index = ii * ncols + jj
                 image = datasets.unnormalize_image(xhats[kk, index])
-
-                if cfg.problem.target == "mnist":
-                    axs[ii, jj].imshow(image, cmap="gray")
-                else:
-                    axs[ii, jj].imshow(image)
+                axs[ii, jj].imshow(image)
 
         wandb.log({titles[kk]: wandb.Image(fig)})
 

@@ -65,14 +65,11 @@ def main(
 
     if cfg.problem.gaussian_scale == "adaptive":
         if (
-            cfg.problem.target == "mnist"
-            or cfg.problem.target == "cifar10"
+            cfg.problem.target == "cifar10"
             or cfg.problem.target == "celeb_a"
             or "afhq" in cfg.problem.target
         ):
             rescale_value = 0.5
-        elif "imagenet" in cfg.problem.target:
-            rescale_value = 1.0
         cfg.network.rescale = rescale_value
 
     if cfg.training.conditional:

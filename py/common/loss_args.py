@@ -157,9 +157,7 @@ def get_batch(
     """Extract a batch based on the structure expected for image
     or non-image datasets."""
     is_image_dataset = (
-        ("imagenet" in cfg.problem.target)
-        or (cfg.problem.target in ["mnist", "cifar10", "celeb_a"])
-        or ("afhq" in cfg.problem.target)
+        (cfg.problem.target in ["cifar10", "celeb_a"]) or ("afhq" in cfg.problem.target)
     )
 
     batch = next(statics.ds)

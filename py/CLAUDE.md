@@ -17,7 +17,7 @@ python py/launchers/learn.py --cfg_path configs.default_cifar10 --slurm_id 0
 
 # Training with external paths (HPC environments)
 python py/launchers/learn.py \
-    --cfg_path configs.imagenet32_medium \
+    --cfg_path configs.cifar10 \
     --slurm_id 0 \
     --dataset_location /path/to/datasets \
     --output_folder /path/to/outputs

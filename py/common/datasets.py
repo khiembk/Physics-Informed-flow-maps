@@ -52,12 +52,7 @@ def preprocess_image(cfg, x: Dict) -> Dict:
     image = tf.cast(image, tf.float32)
     label = tf.cast(label, tf.float32)
 
-    if (
-        cfg.problem.target == "mnist"
-        or cfg.problem.target == "cifar10"
-        or "imagenet" in cfg.problem.target
-        or "afhq" in cfg.problem.target
-    ):
+    if cfg.problem.target == "cifar10" or "afhq" in cfg.problem.target:
         image = normalize_image_tf(image)
     elif cfg.problem.target == "celeb_a":
         image = preprocess_celeb_a(image)
@@ -85,27 +80,18 @@ def random_flip_chw(x: Dict, seed=None):
 
 def get_image_dataset(cfg: config_dict.ConfigDict):
     """Assemble a TensorFlow dataset for the specified problem target."""
-    small_image_datasets = ["mnist", "cifar10", "celeb_a"]
+    small_image_datasets = ["cifar10", "celeb_a"]
     is_small_image_dataset = cfg.problem.target in small_image_datasets
-    is_imagenet = "imagenet" in cfg.problem.target
     is_afhq = "afhq" in cfg.problem.target
 
     if is_small_image_dataset:
-        if cfg.problem.target == "mnist":
-            ds = tfds.load(
-                "mnist",
-                split="train",
-                shuffle_files=True,
-                data_dir=cfg.problem.dataset_location,
-            )
-        elif cfg.problem.target == "cifar10":
+        if cfg.problem.target == "cifar10":
             ds = tfds.load(
                 "cifar10",
                 split="train",
                 shuffle_files=True,
                 data_dir=cfg.problem.dataset_location,
             )
-
         elif cfg.problem.target == "celeb_a":
             ds = tfds.load(
                 "celeb_a",
@@ -113,10 +99,6 @@ def get_image_dataset(cfg: config_dict.ConfigDict):
                 shuffle_files=True,
                 data_dir=cfg.problem.dataset_location,
             )
-
-    elif is_imagenet:
-        load_str = f"{cfg.problem.dataset_location}/{cfg.problem.target}/train"
-        ds = tf.data.experimental.load(load_str)
     elif is_afhq:
         load_str = f"{cfg.problem.dataset_location}/{cfg.problem.target}"
         ds = tf.data.experimental.load(load_str)
@@ -136,7 +118,9 @@ def get_image_dataset(cfg: config_dict.ConfigDict):
     return ds
 
 
-def sample_checkerboard(n_samples: int, key: jnp.ndarray, *, n_squares: int) -> np.ndarray:
+def sample_checkerboard(
+    n_samples: int, key: jnp.ndarray, *, n_squares: int
+) -> np.ndarray:
     """
     Samples the checkerboard dataset on [-1,1] x [-1,1]
     with alternating squares removed.
@@ -147,7 +131,9 @@ def sample_checkerboard(n_samples: int, key: jnp.ndarray, *, n_squares: int) -> 
 
     while total_samples < n_samples:
         # Generate uniform samples on unit square
-        curr_samples = np.random.rand(n_samples * 2, 2)  # Generate extra to account for filtering
+        curr_samples = np.random.rand(
+            n_samples * 2, 2
+        )  # Generate extra to account for filtering
 
         # Determine which square each point falls into
         x_idx = (curr_samples[:, 0] * n_squares).astype(int)
@@ -170,7 +156,9 @@ def setup_base(cfg: config_dict.ConfigDict, ex_input: jnp.ndarray) -> Callable:
 
         @functools.partial(jax.jit, static_argnums=(0,))
         def sample_rho0(bs: int, key: jnp.ndarray):
-            return cfg.network.rescale * jax.random.normal(key, shape=(bs, *ex_input.shape))
+            return cfg.network.rescale * jax.random.normal(
+                key, shape=(bs, *ex_input.shape)
+            )
 
     else:
         raise ValueError("Specified base density is not implemented.")
@@ -218,10 +206,8 @@ def setup_target(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
         ds = np_to_tfds(cfg, x1s)
 
     elif (
-        cfg.problem.target == "mnist"
-        or cfg.problem.target == "cifar10"
+        cfg.problem.target == "cifar10"
         or cfg.problem.target == "celeb_a"
-        or "imagenet" in cfg.problem.target
         or "afhq" in cfg.problem.target
     ):
         ds = get_image_dataset(cfg)
@@ -232,13 +218,11 @@ def setup_target(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
 
     # compute standard deviation of the dataset
     if cfg.problem.gaussian_scale == "adaptive":
-        # std on MNIST and CIFAR10 \approx 0.5 -- just hard-code
+        # hard code
         if (
-            cfg.problem.target == "mnist"
-            or cfg.problem.target == "cifar10"
+            cfg.problem.target == "cifar10"
             or cfg.problem.target == "celeb_a"
             or "afhq" in cfg.problem.target
-            or "imagenet" in cfg.problem.target
         ):
             rescale_value = 0.5
 

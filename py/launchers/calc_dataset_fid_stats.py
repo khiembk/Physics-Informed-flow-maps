@@ -46,25 +46,14 @@ import tensorflow_datasets as tfds
     help="Path to save (mu,sigma).npz",
 )
 def main(dataset_location: str, batch: int, dataset: str, out: str):
-    if dataset == "cifar10" or dataset == "imagenet64" or "afhq" in dataset:
+    if dataset == "cifar10" or "afhq" in dataset:
         preprocess = fid_utils.process_image_for_fid
     elif dataset == "celeb_a":
         preprocess = fid_utils.process_celeba_for_fid
     else:
         raise ValueError(f"Dataset name: {dataset} not implemented for FID computation.")
 
-    if dataset == "imagenet64":
-        load_str = f"{dataset_location}/imagenet64/train"
-        ds = (
-            tf.data.experimental.load(load_str)
-            .map(
-                preprocess,
-                num_parallel_calls=tf.data.AUTOTUNE,
-            )
-            .batch(batch)
-            .as_numpy_iterator()
-        )
-    elif "afhq" in dataset:
+    if "afhq" in dataset:
         load_str = f"{dataset_location}/{dataset}"
         ds = (
             tf.data.experimental.load(load_str)
