@@ -40,7 +40,7 @@ We perform a comprehensive experimental comparison of LSD, PSD, and ESD across C
 
 - **ESD** exhibits training instability due to the spatial Jacobian and temporal derivatives appearing in its objective, particularly at higher resolutions, necessitating careful training schemes and hyperparameter tuning.
 - **PSD** avoids spatial and temporal derivatives, leading to excellent training stability, but suffers from compounding errors that degrade sample quality and reduce performance.
-- **LSD** avoids spatial Jacobians and bootstrapping from small steps, exhibiting stable training without compounding errors and achieving the highest-quality samples on all problems tried.
+- **LSD** avoids spatial Jacobians and bootstrapping from small steps, leading to stable training without compounding errors and achieving the highest-quality samples on all problems studied.
 
 ## Installation
 
