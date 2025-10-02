@@ -8,13 +8,14 @@
 ![Overview](figs/overview.png)
 
 **Official repository for "How to build a consistency model: Learning flow maps via self-distillation" (NeurIPS 2025).**
+
 by Nicholas M. Boffi (CMU), Michael Albergo (Harvard), and Eric Vanden-Eijnden (Courant Institute + Capital Fund Management)
 
 ## Background
 
-Flow maps are a new class of generative models that generalize consistency models, enabling the generation of samples in just one or a few forward passes of the network. 
+Flow maps are a new class of generative models that generalize consistency models, enabling the generation of samples in just one or a few forward passes of the learned network. 
 
-This work introduces a unified mathematical framework for their design, revealing that existing approaches (consistency models, consistency trajectory models, shortcut models) are all particular cases of a broader design space. We present three direct training algorithms based on a notion of self-distillation, prove their connections to existing methods, and show that the new **Lagrangian Self-Distillation (LSD)** approach delivers superior performance and training stability without requiring a pre-trained teacher.
+This work introduces a unified mathematical framework for their design, revealing that existing approaches (consistency models, consistency trajectory models, shortcut models) are all particular cases of a broader design space. We present three direct training algorithms based on a notion of *self-distillation*, in which the flow map distills an implicit flow to eliminate dependence on a pre-trained teacher. We prove their connections to existing methods and show that a new **Lagrangian Self-Distillation (LSD)** approach delivers superior performance and training stability.
 
 ---
 
