@@ -17,7 +17,6 @@ Flow maps are a new class of generative models that generalize consistency model
 
 This work introduces a unified mathematical framework for their design, revealing that existing approaches (consistency models, consistency trajectory models, shortcut models) are all particular cases of a broader design space. We present three direct training algorithms based on a notion of *self-distillation*, in which the flow map distills an implicit flow to eliminate dependence on a pre-trained teacher. We prove their connections to existing methods and show that a new **Lagrangian Self-Distillation (LSD)** approach delivers superior performance and training stability.
 
----
 
 ## What this paper does
 
@@ -41,7 +40,6 @@ Systematic evaluation across CIFAR-10, CelebA-64, AFHQ-64, and 2D Checker shows:
 - **No spatial Jacobians** -- computational advantage over ESD and consistency models
 - **Few-step quality competitive with multi-step flows**
 
----
 
 ## Installation
 
@@ -95,7 +93,6 @@ pip install \
 python -c "import jax; print(f'JAX {jax.__version__} | Devices: {jax.devices()}')"
 ```
 
----
 
 ## Quick start
 
@@ -135,7 +132,6 @@ python py/launchers/sample_and_calc_fid.py \
     --n_steps 1
 ```
 
----
 
 ## Datasets
 
@@ -144,7 +140,6 @@ python py/launchers/sample_and_calc_fid.py \
 - **AFHQ-64**: Download via HuggingFace datases and crop to 64x64.
 - **Checker**: Generated on-the-fly (2D toy problem)
 
----
 
 ## Multi-GPU training
 
@@ -158,13 +153,11 @@ python py/launchers/learn.py --cfg_path configs.cifar10 --slurm_id 0
 CUDA_VISIBLE_DEVICES=0,1,2,3 python py/launchers/learn.py --cfg_path configs.cifar10 --slurm_id 0
 ```
 
----
 
 ## Reproducibility
 
 Each experiment reported in the paper can be exactly reproduced by using one of the included configuration files.
 
----
 
 ## Project structure
 
@@ -180,7 +173,6 @@ flow-maps/
 ├── notebooks/            # ipython notebooks for figure generation
 ```
 
----
 
 ## Citation
 
@@ -198,8 +190,7 @@ If you found this repository useful or the associated paper interesting, please 
 }
 ```
 
----
 
 ## License
 
-MIT License -- see [LICENSE](LICENSE).
+This code is distributed under the MIT License -- see [LICENSE](LICENSE).
