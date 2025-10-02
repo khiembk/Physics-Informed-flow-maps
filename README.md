@@ -8,6 +8,7 @@
 ![Overview](figs/overview.png)
 
 **Official repository for "How to build a consistency model: Learning flow maps via self-distillation" (NeurIPS 2025).**
+by Nicholas M. Boffi (CMU), Michael Albergo (Harvard), and Eric Vanden-Eijnden (Courant Institute + Capital Fund Management)
 
 ## Background
 
