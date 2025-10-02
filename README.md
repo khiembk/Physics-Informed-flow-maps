@@ -160,22 +160,22 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python py/launchers/learn.py --cfg_path configs.cif
 ```
 flow-maps/
 ├── py/
-│   ├── configs/          # Experiment configs (cifar10.py, celeba64.py, etc.)
+│   ├── configs/              # Experiment configs (cifar10.py, celeba64.py, etc.)
 │   ├── common/
-│   │   ├── losses.py     # LSD, PSD, ESD implementations
-│   │   ├── flow_map.py   # Flow map wrappers
-│   │   ├── edm2_net.py   # EDM2 UNet architecture
-│   │   ├── interpolant.py   # Stochastic interpolants
-│   │   ├── datasets.py   # Dataset loading and preprocessing
-│   │   ├── fid_utils.py  # FID computation and Inception network
-│   │   ├── state_utils.py   # EMA training state management
-│   │   ├── dist_utils.py # Multi-GPU distributed utilities
-│   │   ├── loss_args.py  # Loss function arguments and sampling
-│   │   ├── logging.py    # Training logging and visualization
+│   │   ├── losses.py         # LSD, PSD, ESD implementations
+│   │   ├── flow_map.py       # Flow map wrappers
+│   │   ├── edm2_net.py       # EDM2 UNet architecture
+│   │   ├── interpolant.py    # Stochastic interpolants
+│   │   ├── datasets.py       # Dataset loading and preprocessing
+│   │   ├── fid_utils.py      # FID computation and Inception network
+│   │   ├── state_utils.py    # EMA training state management
+│   │   ├── dist_utils.py     # Multi-GPU distributed utilities
+│   │   ├── loss_args.py      # Loss function arguments and sampling
+│   │   ├── logging.py        # Training logging and visualization
 │   │   ├── network_utils.py  # Network initialization helpers
-│   │   └── updates.py    # Optimizer and learning rate schedules
-│   └── launchers/        # Training (learn.py) and eval scripts
-├── notebooks/            # Jupyter notebooks for figure generation
+│   │   └── updates.py        # Optimizer and learning rate schedules
+│   └── launchers/            # Training (learn.py) and eval scripts
+├── notebooks/                # Jupyter notebooks for figure generation
 ```
 
 
