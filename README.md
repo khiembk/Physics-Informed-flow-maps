@@ -133,11 +133,12 @@ python py/launchers/sample_and_calc_fid.py \
 
 
 ## Datasets
+Experiments on the following datasets can be run with the included code:
 
 - **CIFAR-10**: Auto-downloaded via TensorFlow Datasets
 - **CelebA-64**: Auto-downloaded via TensorFlow Datasets; pre-processed via cropping in included code.
-- **AFHQ-64**: Download via HuggingFace datases and crop to 64x64.
 - **Checker**: Generated on-the-fly (2D toy problem)
+- **AFHQ-64**: You'll need to manually download this via HuggingFace and crop to 64x64.
 
 
 ## Multi-GPU training
