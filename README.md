@@ -164,9 +164,18 @@ flow-maps/
 │   ├── common/
 │   │   ├── losses.py     # LSD, PSD, ESD implementations
 │   │   ├── flow_map.py   # Flow map wrappers
-│   │   └── edm2_net.py   # EDM2 UNet architecture
+│   │   ├── edm2_net.py   # EDM2 UNet architecture
+│   │   ├── interpolant.py   # Stochastic interpolants
+│   │   ├── datasets.py   # Dataset loading and preprocessing
+│   │   ├── fid_utils.py  # FID computation and Inception network
+│   │   ├── state_utils.py   # EMA training state management
+│   │   ├── dist_utils.py # Multi-GPU distributed utilities
+│   │   ├── loss_args.py  # Loss function arguments and sampling
+│   │   ├── logging.py    # Training logging and visualization
+│   │   ├── network_utils.py  # Network initialization helpers
+│   │   └── updates.py    # Optimizer and learning rate schedules
 │   └── launchers/        # Training (learn.py) and eval scripts
-├── notebooks/            # ipython notebooks for figure generation
+├── notebooks/            # Jupyter notebooks for figure generation
 ```
 
 
