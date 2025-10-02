@@ -30,7 +30,7 @@ We show that the **tangent condition** -- a simple differential relation between
 From our characterizations, we derive three self-distillation methods:
 
 - **Lagrangian Self-Distillation (LSD)** -- An approach that matches the time derivatives of the flow map to the underlying flow. The method avoids spatial Jacobians and bootstrapping from small steps during training, leading to high performance and training stability.
-- **Progressive Self-Distillation (PSD)** -- An approach that uses the map itself to bootstrap smaller steps into larger steps. Avoids the use of spatial or temporal dericatives, leading to excellent training stability, but exhibits distribution shift and compounding errors, leading to reduced performance in theory and in practice. Reduces to shortcut models in a particular case.
+- **Progressive Self-Distillation (PSD)** -- An approach that uses the map itself to bootstrap smaller steps into larger steps. Avoids the use of spatial or temporal dericatives, leading to excellent training stability, but may exhibit distribution shift and compounding errors. Reduces to shortcut models in a particular case.
 - **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing a partial differential equation residual. Involves both spatial and temporal derivatives, leading to training instability. Reduces to consistency training for consistency models and consistency trajectory models as particular cases.
 
 ### 3. Empirical analysis
