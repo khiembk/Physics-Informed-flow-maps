@@ -32,7 +32,7 @@ From our characterizations, we derive three self-distillation methods:
 
 - **Lagrangian Self-Distillation (LSD)** -- An approach that matches the time derivative of the flow map to the underlying implicit flow.
 - **Progressive Self-Distillation (PSD)** -- An approach that uses the map itself to bootstrap smaller steps into larger steps. Reduces to shortcut models in a particular case.
-- **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing the squared residual of a partial differential equation. Reduces to consistency training for consistency models and consistency trajectory models as particular cases.
+- **Eulerian Self-Distillation (ESD)** -- An approach that learns the flow map by minimizing the squared residual of a partial differential equation. Reduces to consistency training for consistency models and consistency trajectory models as a particular case.
 
 ### 3. Empirical analysis
 
