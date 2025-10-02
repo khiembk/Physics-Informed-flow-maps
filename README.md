@@ -38,7 +38,7 @@ From our characterizations, we derive three self-distillation methods:
 
 We perform a comprehensive experimental comparison of LSD, PSD, and ESD across CIFAR-10, CelebA-64, AFHQ-64, and a two-dimensional synthetic dataset. Our findings reveal that:
 
-- **ESD** exhibits training instability due to spatial Jacobian and temporal derivative computation, particularly at higher resolutions, necessitating careful training schemes and hyperparameter tuning.
+- **ESD** exhibits training instability due to the spatial Jacobian and temporal derivatives appearing in its objective, particularly at higher resolutions, necessitating careful training schemes and hyperparameter tuning.
 - **PSD** avoids spatial and temporal derivatives, leading to excellent training stability, but suffers from compounding errors that degrade sample quality and reduce performance.
 - **LSD** avoids spatial Jacobians and bootstrapping from small steps, exhibiting stable training without compounding errors and achieving the highest-quality samples on all problems tried.
 
