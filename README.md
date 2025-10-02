@@ -36,12 +36,11 @@ From our characterizations, we derive three self-distillation methods:
 
 ### 3. Empirical analysis
 
-Systematic evaluation across CIFAR-10, CelebA-64, AFHQ-64, and 2D Checker shows:
-- **LSD achieves best FID scores consistently**
-- **Training stability matches flow matching** -- no multi-phase training pipelines or teacher distillation needed
-- **No spatial Jacobians** -- computational advantage over ESD and consistency models
-- **Few-step quality competitive with multi-step flows**
+We perform a comprehensive comparison of LSD, PSD, and ESD across CIFAR-10, CelebA-64, AFHQ-64, and a two-dimensional synthetic dataset. Our findings reveal that:
 
+- **ESD** exhibits training instability due to the spatial Jacobian computation, particularly at higher resolutions, requiring careful training schemes and hyperparameter tuning.
+- **PSD** trains stably but suffers from compounding errors that degrade sample quality, leading to reduced performance.
+- **LSD** exhibits stable training and no compounding errors, leading to the highest-quality samples on all problems tried.
 
 ## Installation
 
