@@ -38,9 +38,9 @@ From our characterizations, we derive three self-distillation methods:
 
 We perform a comprehensive comparison of LSD, PSD, and ESD across CIFAR-10, CelebA-64, AFHQ-64, and a two-dimensional synthetic dataset. Our findings reveal that:
 
-- **ESD** exhibits training instability due to the spatial Jacobian computation, particularly at higher resolutions, requiring careful training schemes and hyperparameter tuning.
-- **PSD** trains stably but suffers from compounding errors that degrade sample quality, leading to reduced performance.
-- **LSD** exhibits stable training and no compounding errors, leading to the highest-quality samples on all problems tried.
+- ESD exhibits training instability due to the spatial Jacobian computation, particularly at higher resolutions, necessitating careful training schemes and hyperparameter tuning.
+- PSD trains stably, but suffers from compounding errors that degrade sample quality, leading to reduced performance.
+- LSD exhibits stable training and does not suffer from compounding errors, leading to the highest-quality samples on all problems tried.
 
 ## Installation
 
@@ -112,7 +112,7 @@ python py/launchers/learn.py --cfg_path configs.afhq64 --slurm_id 0
 python py/launchers/learn.py --cfg_path configs.checker --slurm_id 0
 ```
 
-**Algorithm selection** via `slurm_id`, also enabling sweeps with slurm job arrays:
+The algorithm can be selected via `slurm_id`, which can also be used to run all experiments simultaneously with a slurm job array:
 
 | ID | Algorithm |
 |----|-----------|
@@ -143,7 +143,7 @@ python py/launchers/sample_and_calc_fid.py \
 
 
 ## Multi-GPU training
-
+  * [ ] 
 This codebase is written for single-node, multi-GPU training. JAX automatically uses all visible GPUs:
 
 ```bash
