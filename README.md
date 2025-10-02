@@ -7,9 +7,9 @@
 
 ![Overview](figs/overview.png)
 
-**Official repository for "How to build a consistency model: Learning flow maps via self-distillation" (NeurIPS 2025).**
+**Official repository for "How to build a consistency model: Learning flow maps via self-distillation" (NeurIPS 2025).** https://arxiv.org/abs/2505.18825
 
-by Nicholas M. Boffi (CMU), Michael Albergo (Harvard), and Eric Vanden-Eijnden (Courant Institute + Capital Fund Management)
+by Nicholas M. Boffi (CMU), Michael Albergo (Harvard), and Eric Vanden-Eijnden (Courant Institute of Mathematical Sciences, Capital Fund Management)
 
 ## Background
 
@@ -193,4 +193,4 @@ If you found this repository useful or the associated paper interesting, please 
 
 ## License
 
-This code is distributed under the MIT License -- see [LICENSE](LICENSE).
+This code is distributed under the MIT License.
