@@ -18,20 +18,6 @@ from . import interpolant as interpolant
 Parameters = Dict[str, Dict]
 
 
-def sum_reduce(func):
-    """
-    A decorator that computes the sum of the output of the decorated function.
-    Designed to be used on functions that are already batch-processed (e.g., with jax.vmap).
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        batched_outputs = func(*args, **kwargs)
-        return jnp.sum(batched_outputs)
-
-    return wrapper
-
-
 def mean_reduce(func):
     """
     A decorator that computes the mean of the output of the decorated function.
@@ -93,7 +79,9 @@ def psd_term(
     Is = interp.calc_It(s, x0, x1)
 
     # compute the full jump
-    X_st, phi_st = X.apply(params, s, t, Is, label, train=False, rngs=rng, return_X_and_phi=True)
+    X_st, phi_st = X.apply(
+        params, s, t, Is, label, train=False, rngs=rng, return_X_and_phi=True
+    )
 
     # break it down into two jumps
     if stopgrad_type == "convex":
@@ -181,7 +169,9 @@ def lsd_term(
     Is = interp.calc_It(s, x0, x1)
 
     # Compute the distillation loss
-    Xst_Is, dt_Xst = X.apply(params, s, t, Is, label, train=False, method="partial_t", rngs=rng)
+    Xst_Is, dt_Xst = X.apply(
+        params, s, t, Is, label, train=False, method="partial_t", rngs=rng
+    )
 
     if stopgrad_type == "convex":
         Xst_Is = jax.lax.stop_gradient(Xst_Is)
@@ -238,7 +228,9 @@ def esd_term(
     Is = interp.calc_It(s, x0, x1)
 
     # compute the derivative with respect to the first time
-    _, ds_Xst = X.apply(params, s, t, Is, label, train=False, method="partial_s", rngs=rng)
+    _, ds_Xst = X.apply(
+        params, s, t, Is, label, train=False, method="partial_s", rngs=rng
+    )
 
     # stopgrad everything to avoid backpropagating through the UNet spatial Jacobian
     if stopgrad_type == "full":
@@ -257,7 +249,9 @@ def esd_term(
         # compute the advective term
         _, grad_Xst_b = jax.lax.stop_gradient(
             jax.jvp(
-                lambda x: X.apply(teacher_params, s, t, x, label, train=False, rngs=rng),
+                lambda x: X.apply(
+                    teacher_params, s, t, x, label, train=False, rngs=rng
+                ),
                 primals=(Is,),
                 tangents=(b_eval,),
             )
@@ -422,7 +416,9 @@ def setup_loss(
     # Shared batch loss (original behavior)
     @mean_reduce
     @functools.partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0, 0, 0, 0))
-    def shared_batch_loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys):
+    def shared_batch_loss(
+        params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
+    ):
         return self_distill(
             params,
             teacher_params,
@@ -461,7 +457,9 @@ def setup_loss(
     # Pure off-diagonal loss
     @mean_reduce
     @functools.partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0, 0, 0, 0))
-    def offdiagonal_only_loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys):
+    def offdiagonal_only_loss(
+        params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
+    ):
         rng = {"dropout": dropout_keys}
 
         if cfg.training.loss_type == "psd":
@@ -514,7 +512,9 @@ def setup_loss(
             raise ValueError(f"Unknown loss_type: {cfg.training.loss_type}")
 
     # Split batch wrapper (no vmap/mean_reduce, handles that internally)
-    def split_batch_loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys):
+    def split_batch_loss(
+        params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
+    ):
         """Split batch into diagonal and off-diagonal portions."""
         diag_bs = cfg.training.diag_bs
         total_bs = x0.shape[0]
@@ -568,7 +568,9 @@ def setup_loss(
             )
         else:
             # Use split batch
-            return split_batch_loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys)
+            return split_batch_loss(
+                params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
+            )
 
     # Return the routing loss and diagonal-only for interp_loss
     return loss, diagonal_only_loss
