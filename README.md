@@ -132,7 +132,7 @@ python py/launchers/sample_and_calc_fid.py \
 ```
 
 
-## Datasets
+## Datasets and reproducibility
 Experiments on the following datasets can be run with the included code:
 
 - **CIFAR-10**: Auto-downloaded via TensorFlow Datasets.
@@ -140,11 +140,10 @@ Experiments on the following datasets can be run with the included code:
 - **Checker**: Generated on-the-fly.
 - **AFHQ-64**: You'll need to manually download this via [HuggingFace](https://huggingface.co/datasets/huggan/AFHQv2) and crop to 64x64.
 
-Code to download and process AFHQ is included in ``notebooks/download_afhq.ipynb``.
+Code to download and process AFHQ is included in ``notebooks/download_afhq.ipynb``. Each experiment reported in the paper can be exactly reproduced by using one of the included configuration files.
 
 
 ## Multi-GPU training
-  * [ ] 
 This codebase is written for single-node, multi-GPU training. JAX automatically uses all visible GPUs:
 
 ```bash
@@ -154,11 +153,6 @@ python py/launchers/learn.py --cfg_path configs.cifar10 --slurm_id 0
 # Restrict to specific GPUs
 CUDA_VISIBLE_DEVICES=0,1,2,3 python py/launchers/learn.py --cfg_path configs.cifar10 --slurm_id 0
 ```
-
-
-## Reproducibility
-
-Each experiment reported in the paper can be exactly reproduced by using one of the included configuration files.
 
 
 ## Project structure
