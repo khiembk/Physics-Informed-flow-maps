@@ -58,7 +58,7 @@ conda create -n flowmaps python=3.9
 conda activate flowmaps
 ```
 
-**2. Install JAX** (choose your CUDA version)
+**2. Install JAX** for your CUDA version:
 ```bash
 # CUDA 12.x
 pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
