@@ -72,7 +72,7 @@ def get_config(
     config.logging.plot_bs = 25
     config.logging.visual_freq = 5000
     config.logging.save_freq = 5000  # Save every 5k steps
-    config.logging.wandb_project = "fmm2"
+    config.logging.wandb_project = "self-distill-flow-maps"
 
     # Create systematic name for the experiment
     method_str = f"{loss_type}_{psd_type}" if psd_type else loss_type
