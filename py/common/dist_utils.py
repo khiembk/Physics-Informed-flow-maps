@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Simple utilities for single-node multi-GPU data parallelism.
 """
