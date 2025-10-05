@@ -14,6 +14,7 @@ from ml_collections import config_dict
 
 from . import flow_map as flow_map
 from . import interpolant as interpolant
+from . import loss_args
 
 Parameters = Dict[str, Dict]
 
@@ -380,9 +381,8 @@ def setup_loss(
 
     def loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys):
         """Split batch into diagonal and off-diagonal portions."""
-        diag_bs = cfg.training.diag_bs
         total_bs = x0.shape[0]
-        offdiag_bs = total_bs - diag_bs
+        diag_bs, offdiag_bs = loss_args._get_diag_offdiag_bs(cfg, total_bs)
 
         total_loss = 0.0
 
