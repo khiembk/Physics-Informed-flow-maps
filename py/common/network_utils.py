@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Helper routines for neural network definitions.
 """
@@ -113,7 +113,13 @@ class FlowMapMLP(nn.Module):
     ) -> jnp.ndarray:
         del label
         phi_st = self.calc_phi(
-            s, t, x, label=None, train=train, calc_weight=calc_weight, init_weights=init_weights
+            s,
+            t,
+            x,
+            label=None,
+            train=train,
+            calc_weight=calc_weight,
+            init_weights=init_weights,
         )
         if calc_weight:
             phi_st, weight = phi_st
@@ -215,7 +221,9 @@ class EDM2FlowMap(nn.Module):
         init_weights: bool = False,
     ):
         s, t, x, label = self.process_inputs(s, t, x, label)
-        rslt = self.net(s, t, x, label, train, calc_weight, return_X_and_phi, init_weights)
+        rslt = self.net(
+            s, t, x, label, train, calc_weight, return_X_and_phi, init_weights
+        )
 
         if calc_weight:
             Xst, logvar = rslt
