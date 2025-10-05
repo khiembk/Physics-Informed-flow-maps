@@ -1,4 +1,7 @@
 """
+Nicholas M. Boffi
+10/5/25
+
 Algorithmic comparison on the AFHQ-64 dataset.
 """
 
