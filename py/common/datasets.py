@@ -15,8 +15,6 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 from ml_collections import config_dict
 
-from . import gmm as gmm
-
 
 def unnormalize_image(image: jnp.ndarray):
     """Unnormalize an image from [-1, 1] to [0, 1] by scaling and clipping."""
