@@ -81,9 +81,7 @@ def get_config(
     # Create systematic name for the experiment
     method_str = f"{loss_type}_{psd_type}" if psd_type else loss_type
 
-    config.logging.wandb_name = (
-        f"checker_{method_str}_stopgrad_{stopgrad_type}_diag75_9_9"
-    )
+    config.logging.wandb_name = f"checker_paper_{method_str}"
     config.logging.wandb_entity = "boffi"
     config.logging.output_folder = output_folder
     config.logging.output_name = config.logging.wandb_name
