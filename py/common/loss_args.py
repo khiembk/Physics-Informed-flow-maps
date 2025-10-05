@@ -212,11 +212,8 @@ def get_loss_fn_args(
     # grab next batch of samples and labels
     x1batch, label_batch, prng_key = get_batch(cfg, statics, prng_key)
 
-    # set up the teacher
-    if cfg.training.use_ema_teacher:
-        teacher_params = train_state.ema_params[0.9999]
-    else:
-        teacher_params = train_state.params
+    # set up the teacher (uses current params for self-distillation)
+    teacher_params = train_state.params
 
     # for training flow map
     loss_fn_args = (
