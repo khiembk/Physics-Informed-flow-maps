@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 jax port of the EDM2 UNet architecture with positional embeddings.
 """
@@ -42,7 +42,9 @@ def project_to_sphere(params: dict):
 
 def project_weight_to_sphere(key: str, val: np.ndarray):
     """Project weight to sphere only if it is an MPConv weight."""
-    return jax.lax.cond("mpconv_weight" in key, lambda _: normalize(val), lambda _: val, None)
+    return jax.lax.cond(
+        "mpconv_weight" in key, lambda _: normalize(val), lambda _: val, None
+    )
 
 
 def multi_axis_norm(x: jnp.ndarray, axis: Tuple[int] = (1, 2, 3)):
@@ -130,41 +132,6 @@ def mp_cat(a: jnp.ndarray, b: jnp.ndarray, dim: int = 1, t: float = 0.5):
     return jnp.concatenate([wa * a, wb * b], axis=dim)
 
 
-class MPFourierEmbedding(nn.Module):
-    """
-    Magnitude-preserving random Fourier embedding (EDM2-style).
-    """
-
-    dim: int
-    bandwidth: float = 1.0
-    dtype: Any = jnp.float32
-
-    def setup(self):
-        self.freqs = self.variable(
-            "constants",
-            "freqs",
-            lambda: 2
-            * jnp.pi
-            * jax.random.normal(self.make_rng("constants"), (self.dim,), self.dtype)
-            * self.bandwidth,
-        )
-
-        self.phases = self.variable(
-            "constants",
-            "phases",
-            lambda: 2
-            * jnp.pi
-            * jax.random.uniform(self.make_rng("constants"), (self.dim,), self.dtype),
-        )
-
-    def __call__(self, t: jnp.ndarray) -> jnp.ndarray:
-        t = t.astype(jnp.float32)
-        t_flat = jnp.reshape(t, (t.shape[0],))
-        angles = t_flat[:, None] * self.freqs.value + self.phases.value  # (B, dim)
-        emb = jnp.cos(angles) * jnp.sqrt(2.0)  # variance-preserving
-        return emb.astype(t.dtype)  # (B, dim)
-
-
 class MPPositionalEmbedding(nn.Module):
     """
     Deterministic positional embedding with magnitude-preserving scaling.
@@ -179,7 +146,9 @@ class MPPositionalEmbedding(nn.Module):
         assert half % 2 == 0
 
         # create logarithmically spaced frequencies
-        freqs = jnp.exp(-jnp.log(self.max_period) * jnp.arange(half, dtype=jnp.float32) / half)
+        freqs = jnp.exp(
+            -jnp.log(self.max_period) * jnp.arange(half, dtype=jnp.float32) / half
+        )
 
         # compute embeddings
         args = jnp.outer(timesteps.astype(jnp.float32), freqs)
@@ -239,7 +208,9 @@ class Block(nn.Module):
     emb_channels: int  # Number of embedding channels
     flavor: str = "enc"  # Flavor: 'enc' or 'dec'
     resample_mode: str = "keep"  # Resampling: 'keep', 'up', or 'down'
-    resample_filter: List[int] = field(default_factory=lambda: [1, 1])  # Resampling filter
+    resample_filter: List[int] = field(
+        default_factory=lambda: [1, 1]
+    )  # Resampling filter
     attention: bool = False  # Include self-attention?
     channels_per_head: int = 64  # Number of channels per attention head
     dropout: float = 0  # Dropout probability
@@ -248,7 +219,9 @@ class Block(nn.Module):
     clip_act: Optional[int] = 256  # Clip output activations
 
     def setup(self):
-        self.num_heads = self.out_channels // self.channels_per_head if self.attention else 0
+        self.num_heads = (
+            self.out_channels // self.channels_per_head if self.attention else 0
+        )
 
         self.emb_gain = self.param("emb_gain", nn.initializers.zeros, ())
         self.conv_res0 = MPConv(
@@ -266,7 +239,9 @@ class Block(nn.Module):
             self.conv_skip = None
 
         if self.num_heads != 0:
-            self.attn_qkv = MPConv(self.out_channels, self.out_channels * 3, kernel=(1, 1))
+            self.attn_qkv = MPConv(
+                self.out_channels, self.out_channels * 3, kernel=(1, 1)
+            )
             self.attn_proj = MPConv(self.out_channels, self.out_channels, kernel=(1, 1))
         else:
             self.attn_qkv = None
@@ -329,7 +304,9 @@ class EDM2FlowMapUNet(nn.Module):
     img_channels: int  # Image channels
     label_dim: int  # Class label dimensionality. 0 = unconditional
     model_channels: int = 192  # Base multiplier for the number of channels
-    channel_mult: List[int] = field(default_factory=lambda: [1, 2, 3, 4])  # Channel multipliers
+    channel_mult: List[int] = field(
+        default_factory=lambda: [1, 2, 3, 4]
+    )  # Channel multipliers
     channel_mult_noise: Optional[int] = None  # Noise embedding multiplier
     channel_mult_emb: Optional[int] = None  # Final embedding multiplier
     num_blocks: int = 3  # Number of residual blocks per resolution
@@ -423,7 +400,9 @@ class EDM2FlowMapUNet(nn.Module):
                     cout, cout, cemb, flavor="dec", attention=True, **self.block_kwargs
                 )
 
-                dec[f"{res}x{res}_in1"] = Block(cout, cout, cemb, flavor="dec", **self.block_kwargs)
+                dec[f"{res}x{res}_in1"] = Block(
+                    cout, cout, cemb, flavor="dec", **self.block_kwargs
+                )
             else:
                 dec[f"{res}x{res}_up"] = Block(
                     cout,
@@ -560,7 +539,9 @@ class PrecondFlowMap(nn.Module):
 
         # Run the model
         xs_in = (c_in * xs).astype(dtype)
-        phi_st = c_out * self.unet(xs_in, ss, ts, class_labels, train=train).astype(jnp.float32)
+        phi_st = c_out * self.unet(xs_in, ss, ts, class_labels, train=train).astype(
+            jnp.float32
+        )
 
         if init_weights:
             # During initialization, ensure weight params are created
