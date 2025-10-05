@@ -1,5 +1,9 @@
 """
-Taken from https://github.com/kvfrans/shortcut-models/blob/601004348667094e1b71f30942199759412d4432/utils/fid.py#L38.
+Nicholas M. Boffi
+10/5/25
+
+Routines mostly taken from
+https://github.com/kvfrans/shortcut-models/blob/601004348667094e1b71f30942199759412d4432/utils/fid.py#L38.
 """
 
 import functools
@@ -211,7 +215,9 @@ class InceptionV3(nn.Module):
             params_dict=get(self.params_dict, "Mixed_5d"),
             dtype=self.dtype,
         )(x, train)
-        x = InceptionB(params_dict=get(self.params_dict, "Mixed_6a"), dtype=self.dtype)(x, train)
+        x = InceptionB(params_dict=get(self.params_dict, "Mixed_6a"), dtype=self.dtype)(
+            x, train
+        )
         x = InceptionC(
             channels_7x7=128,
             params_dict=get(self.params_dict, "Mixed_6b"),
@@ -239,10 +245,12 @@ class InceptionV3(nn.Module):
                 params_dict=get(self.params_dict, "AuxLogits"),
                 dtype=self.dtype,
             )(x, train)
-        x = InceptionD(params_dict=get(self.params_dict, "Mixed_7a"), dtype=self.dtype)(x, train)
-        x = InceptionE(avg_pool, params_dict=get(self.params_dict, "Mixed_7b"), dtype=self.dtype)(
+        x = InceptionD(params_dict=get(self.params_dict, "Mixed_7a"), dtype=self.dtype)(
             x, train
         )
+        x = InceptionE(
+            avg_pool, params_dict=get(self.params_dict, "Mixed_7b"), dtype=self.dtype
+        )(x, train)
         # Following the implementation by @mseitzer, we use max pooling instead
         # of average pooling here.
         # See: https://github.com/mseitzer/pytorch-fid/blob/master/src/pytorch_fid/inception.py#L320
@@ -265,9 +273,18 @@ class InceptionV3(nn.Module):
 
     def _transform_input(self, x):
         if self.transform_input:
-            x_ch0 = jnp.expand_dims(x[..., 0], axis=-1) * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
-            x_ch1 = jnp.expand_dims(x[..., 1], axis=-1) * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
-            x_ch2 = jnp.expand_dims(x[..., 2], axis=-1) * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
+            x_ch0 = (
+                jnp.expand_dims(x[..., 0], axis=-1) * (0.229 / 0.5)
+                + (0.485 - 0.5) / 0.5
+            )
+            x_ch1 = (
+                jnp.expand_dims(x[..., 1], axis=-1) * (0.224 / 0.5)
+                + (0.456 - 0.5) / 0.5
+            )
+            x_ch2 = (
+                jnp.expand_dims(x[..., 2], axis=-1) * (0.225 / 0.5)
+                + (0.406 - 0.5) / 0.5
+            )
             x = jnp.concatenate((x_ch0, x_ch1, x_ch2), axis=-1)
         return x
 
@@ -398,7 +415,9 @@ class InceptionA(nn.Module):
             dtype=self.dtype,
         )(branch3x3dbl, train)
 
-        branch_pool = avg_pool(x, window_shape=(3, 3), strides=(1, 1), padding=((1, 1), (1, 1)))
+        branch_pool = avg_pool(
+            x, window_shape=(3, 3), strides=(1, 1), padding=((1, 1), (1, 1))
+        )
         branch_pool = BasicConv2d(
             out_channels=self.pool_features,
             kernel_size=(1, 1),
@@ -406,7 +425,9 @@ class InceptionA(nn.Module):
             dtype=self.dtype,
         )(branch_pool, train)
 
-        output = jnp.concatenate((branch1x1, branch5x5, branch3x3dbl, branch_pool), axis=-1)
+        output = jnp.concatenate(
+            (branch1x1, branch5x5, branch3x3dbl, branch_pool), axis=-1
+        )
         return output
 
 
@@ -521,7 +542,9 @@ class InceptionC(nn.Module):
             dtype=self.dtype,
         )(branch7x7dbl, train)
 
-        branch_pool = avg_pool(x, window_shape=(3, 3), strides=(1, 1), padding=((1, 1), (1, 1)))
+        branch_pool = avg_pool(
+            x, window_shape=(3, 3), strides=(1, 1), padding=((1, 1), (1, 1))
+        )
         branch_pool = BasicConv2d(
             out_channels=192,
             kernel_size=(1, 1),
@@ -529,7 +552,9 @@ class InceptionC(nn.Module):
             dtype=self.dtype,
         )(branch_pool, train)
 
-        output = jnp.concatenate((branch1x1, branch7x7, branch7x7dbl, branch_pool), axis=-1)
+        output = jnp.concatenate(
+            (branch1x1, branch7x7, branch7x7dbl, branch_pool), axis=-1
+        )
         return output
 
 
@@ -652,7 +677,9 @@ class InceptionE(nn.Module):
         )(branch3x3dbl, train)
         branch3x3dbl = jnp.concatenate((branch3x3dbl_a, branch3x3dbl_b), axis=-1)
 
-        branch_pool = self.pooling(x, window_shape=(3, 3), strides=(1, 1), padding=((1, 1), (1, 1)))
+        branch_pool = self.pooling(
+            x, window_shape=(3, 3), strides=(1, 1), padding=((1, 1), (1, 1))
+        )
         branch_pool = BasicConv2d(
             out_channels=192,
             kernel_size=(1, 1),
@@ -660,7 +687,9 @@ class InceptionE(nn.Module):
             dtype=self.dtype,
         )(branch_pool, train)
 
-        output = jnp.concatenate((branch1x1, branch3x3, branch3x3dbl, branch_pool), axis=-1)
+        output = jnp.concatenate(
+            (branch1x1, branch3x3, branch3x3dbl, branch_pool), axis=-1
+        )
         return output
 
 
@@ -730,8 +759,12 @@ class BatchNorm(nn.Module):
         # see NOTE above on initialization behavior
         initializing = self.is_mutable_collection("params")
 
-        ra_mean = self.variable("batch_stats", "mean", self.mean_init, reduced_feature_shape)
-        ra_var = self.variable("batch_stats", "var", self.var_init, reduced_feature_shape)
+        ra_mean = self.variable(
+            "batch_stats", "mean", self.mean_init, reduced_feature_shape
+        )
+        ra_var = self.variable(
+            "batch_stats", "var", self.var_init, reduced_feature_shape
+        )
 
         if use_running_average:
             mean, var = ra_mean.value, ra_var.value
@@ -751,7 +784,9 @@ class BatchNorm(nn.Module):
             var = mean2 - lax.square(mean)
 
             if not initializing:
-                ra_mean.value = self.momentum * ra_mean.value + (1 - self.momentum) * mean
+                ra_mean.value = (
+                    self.momentum * ra_mean.value + (1 - self.momentum) * mean
+                )
                 ra_var.value = self.momentum * ra_var.value + (1 - self.momentum) * var
 
         y = x - mean.reshape(feature_shape)
@@ -763,7 +798,9 @@ class BatchNorm(nn.Module):
             mul = mul * scale
         y = y * mul
         if self.use_bias:
-            bias = self.param("bias", self.bias_init, reduced_feature_shape).reshape(feature_shape)
+            bias = self.param("bias", self.bias_init, reduced_feature_shape).reshape(
+                feature_shape
+            )
             y = y + bias
         return jnp.asarray(y, self.dtype)
 
