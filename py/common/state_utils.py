@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Utilities for storing training state.
 """
@@ -14,8 +14,7 @@ import jax.numpy as jnp
 import optax
 import tensorflow as tf
 from flax import struct
-from flax.core import freeze, unfreeze
-from flax.serialization import from_bytes, msgpack_restore
+from flax.serialization import from_bytes
 from flax.training import train_state
 from ml_collections import config_dict
 
@@ -84,7 +83,9 @@ def setup_optimizer(cfg: config_dict.ConfigDict):
             "params": jax.tree_util.tree_map(lambda _: True, variables["params"]),
         }
         if "constants" in variables:  # network has Fourier tables
-            masks["constants"] = jax.tree_util.tree_map(lambda _: False, variables["constants"])
+            masks["constants"] = jax.tree_util.tree_map(
+                lambda _: False, variables["constants"]
+            )
         return masks
 
     # define optimizer
@@ -112,7 +113,9 @@ def setup_training_state(
     """Load flax training state."""
 
     # Initialize flow map network
-    net, params, prng_key = flow_map.initialize_flow_map(cfg.network, ex_input, prng_key)
+    net, params, prng_key = flow_map.initialize_flow_map(
+        cfg.network, ex_input, prng_key
+    )
     ema_params = {ema_fac: deepcopy(params) for ema_fac in cfg.training.ema_facs}
 
     # define training state
@@ -138,5 +141,3 @@ def setup_training_state(
             )
 
     return train_state, net, schedule, prng_key
-
-
