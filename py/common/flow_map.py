@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Basic routines for flow map class.
 """
@@ -40,7 +40,9 @@ class FlowMap(nn.Module):
         init_weights: bool = False,
     ) -> jnp.ndarray:
         """Apply the flow map."""
-        return self.flow_map(s, t, x, label, train, calc_weight, return_X_and_phi, init_weights)
+        return self.flow_map(
+            s, t, x, label, train, calc_weight, return_X_and_phi, init_weights
+        )
 
     def partial_t(
         self,
@@ -92,7 +94,9 @@ class FlowMap(nn.Module):
         calc_weight: bool = False,
     ) -> jnp.ndarray:
         """Compute the flow map."""
-        return self.flow_map.calc_phi(s, t, x, label=label, train=train, calc_weight=calc_weight)
+        return self.flow_map.calc_phi(
+            s, t, x, label=label, train=train, calc_weight=calc_weight
+        )
 
     def calc_b(
         self,
@@ -103,7 +107,9 @@ class FlowMap(nn.Module):
         calc_weight: bool = False,
     ) -> jnp.ndarray:
         """Apply the flow map."""
-        return self.flow_map.calc_b(t, x, label=label, train=train, calc_weight=calc_weight)
+        return self.flow_map.calc_b(
+            t, x, label=label, train=train, calc_weight=calc_weight
+        )
 
 
 def sample(
