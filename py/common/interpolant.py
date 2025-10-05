@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Basic class for a stochastic interpolant.
 """
@@ -30,11 +30,15 @@ class Interpolant:
         return self.alpha_dot(t) * x0 + self.beta_dot(t) * x1
 
     @functools.partial(jax.vmap, in_axes=(None, 0, 0, 0))
-    def batch_calc_It(self, t: jnp.ndarray, x0: jnp.ndarray, x1: jnp.ndarray) -> jnp.ndarray:
+    def batch_calc_It(
+        self, t: jnp.ndarray, x0: jnp.ndarray, x1: jnp.ndarray
+    ) -> jnp.ndarray:
         return self.calc_It(t, x0, x1)
 
     @functools.partial(jax.vmap, in_axes=(None, 0, 0, 0))
-    def batch_calc_It_dot(self, t: jnp.ndarray, x0: jnp.ndarray, x1: jnp.ndarray) -> jnp.ndarray:
+    def batch_calc_It_dot(
+        self, t: jnp.ndarray, x0: jnp.ndarray, x1: jnp.ndarray
+    ) -> jnp.ndarray:
         return self.calc_It_dot(t, x0, x1)
 
     def __hash__(self):
