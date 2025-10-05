@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Code for basic wandb visualization and logging.
 """
@@ -8,7 +8,7 @@ Code for basic wandb visualization and logging.
 import functools
 import signal
 import sys
-from typing import Callable, Dict, Tuple
+from typing import Dict, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -50,7 +50,10 @@ def get_params_for_sampling(
         raise ValueError(f"Unknown param_type: {param_type}")
 
     # Select which parameters to use
-    if hasattr(cfg.logging, config_param) and getattr(cfg.logging, config_param) is not None:
+    if (
+        hasattr(cfg.logging, config_param)
+        and getattr(cfg.logging, config_param) is not None
+    ):
         ema_factor = getattr(cfg.logging, config_param)
         # Use EMA parameters with specified factor
         if ema_factor in train_state.ema_params:
@@ -343,7 +346,7 @@ def log_metrics(
     wandb.log(metrics)
 
     if (dist_utils.safe_index(cfg, train_state.step) % cfg.logging.visual_freq) == 0:
-        if "gmm" in cfg.problem.target or cfg.problem.target == "checker":
+        if cfg.problem.target == "checker":
             prng_key = make_lowd_plot(cfg, statics, train_state, prng_key)
         else:
             prng_key = make_image_plot(cfg, statics, train_state, prng_key)
@@ -407,10 +410,7 @@ def make_lowd_plot(
     )
 
     for ax in axs.ravel():
-        if "gmm" in cfg.problem.target:
-            ax.set_xlim([-7.5, 7.5])
-            ax.set_ylim([-7.5, 7.5])
-        elif cfg.problem.target == "checker":
+        if cfg.problem.target == "checker":
             ax.set_xlim([-1.25, 1.25])
             ax.set_ylim([-1.25, 1.25])
         ax.set_aspect("equal")
@@ -425,9 +425,13 @@ def make_lowd_plot(
 
         if jj == 0:
             ax.scatter(x0s[:, 0], x0s[:, 1], s=0.1, alpha=0.5, marker="o", c="black")
-            ax.scatter(plot_x1s[:, 0], plot_x1s[:, 1], s=0.1, alpha=0.5, marker="o", c="C0")
+            ax.scatter(
+                plot_x1s[:, 0], plot_x1s[:, 1], s=0.1, alpha=0.5, marker="o", c="C0"
+            )
         else:
-            ax.scatter(plot_x1s[:, 0], plot_x1s[:, 1], s=0.1, alpha=0.5, marker="o", c="C0")
+            ax.scatter(
+                plot_x1s[:, 0], plot_x1s[:, 1], s=0.1, alpha=0.5, marker="o", c="C0"
+            )
 
             ax.scatter(
                 xhats[jj - 1, :, 0],
@@ -550,8 +554,8 @@ def make_loss_fn_args_plot(
     else:
         # unpack the interpolant loss arguments
         data_args = loss_fn_args[1:]
-        (x0batch, x1batch, _, sbatch, tbatch, _, _, _) = dist_utils.unreplicate_loss_fn_args(
-            cfg, data_args
+        (x0batch, x1batch, _, sbatch, tbatch, _, _, _) = (
+            dist_utils.unreplicate_loss_fn_args(cfg, data_args)
         )
 
     # remove pmap reshaping
@@ -570,7 +574,7 @@ def make_loss_fn_args_plot(
     xtbatch = statics.interp.batch_calc_It(tbatch, x0batch, x1batch)
 
     ## set up plot array
-    if "gmm" in cfg.problem.target or cfg.problem.target == "checker":
+    if cfg.problem.target == "checker":
         titles = [r"$x_0$", r"$x_1$", r"$x_t$", r"$(s, t)$"]
     else:
         titles = [r"$(s, t)$"]
@@ -593,10 +597,7 @@ def make_loss_fn_args_plot(
             ax.set_xlim([-0.1, 1.1])
             ax.set_ylim([-0.1, 1.1])
         else:
-            if "gmm" in cfg.problem.target:
-                ax.set_xlim([-7.5, 7.5])
-                ax.set_ylim([-7.5, 7.5])
-            elif cfg.problem.target == "checker":
+            if cfg.problem.target == "checker":
                 ax.set_xlim([-1.25, 1.25])
                 ax.set_ylim([-1.25, 1.25])
 
@@ -610,7 +611,7 @@ def make_loss_fn_args_plot(
         ax = axs[0, jj]
         ax.set_title(title, fontsize=fontsize)
 
-        if "gmm" in cfg.problem.target or cfg.problem.target == "checker":
+        if cfg.problem.target == "checker":
             if jj == 0:
                 ax.scatter(x0batch[:, 0], x0batch[:, 1], s=0.1, alpha=0.5, marker="o")
             elif jj == 1:
