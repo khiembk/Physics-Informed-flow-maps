@@ -16,7 +16,7 @@
 mkdir -p /n/netscratch/albergo_lab/Everyone/nmboffi/checker/logs
 
 ## Configuration
-PY_DIR=/n/home04/nboffi/lagrangian_map_matching/py
+PY_DIR=/n/home04/nboffi/flow-maps/py
 CONFIG_PATH="configs.checker"
 OUTPUT_FOLDER="/n/netscratch/albergo_lab/Everyone/nmboffi/checker"
 

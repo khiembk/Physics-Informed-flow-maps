@@ -16,7 +16,7 @@
 mkdir -p /n/netscratch/albergo_lab/Everyone/nmboffi/afhq64/fids/logs
 
 ## Configuration
-PY_DIR=/n/home04/nboffi/lagrangian_map_matching/py
+PY_DIR=/n/home04/nboffi/flow-maps/py
 STATS_PATH="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/datasets/afhq64/afhq64_fid_stats.npz"
 OUTPUT_DIR="/n/netscratch/albergo_lab/Everyone/nmboffi/afhq64/fids"
 CHECKPOINT_BASE="/n/netscratch/albergo_lab/Everyone/nmboffi/afhq64"

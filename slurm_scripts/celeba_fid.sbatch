@@ -16,7 +16,7 @@
 mkdir -p /n/netscratch/albergo_lab/Everyone/nmboffi/celeba/fids/logs
 
 ## Configuration
-PY_DIR=/n/home04/nboffi/lagrangian_map_matching/py
+PY_DIR=/n/home04/nboffi/flow-maps/py
 CONFIG_PATH="configs.9_8_25_celeba_loss_method_resume"
 STATS_PATH="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/datasets/celeb_a/celeba_stats.npz"
 OUTPUT_DIR="/n/netscratch/albergo_lab/Everyone/nmboffi/celeba/fids"

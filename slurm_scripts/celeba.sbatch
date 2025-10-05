@@ -16,7 +16,7 @@
 mkdir -p /n/holylabs/LABS/albergo_lab/Everyone/nmboffi/lmm/celeba/logs
 
 ## Configuration
-PY_DIR=/n/home04/nboffi/lagrangian_map_matching/py
+PY_DIR=/n/home04/nboffi/flow-maps/py
 CONFIG_PATH="configs.celeba64"
 DATASET_LOCATION="/n/netscratch/albergo_lab/Everyone"
 OUTPUT_FOLDER="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/lmm/celeba"
