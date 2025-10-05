@@ -1,7 +1,5 @@
 """
-CIFAR-10 comparison of different loss methods.
-Comparing PSD (uniform vs midpoint), ESD (Eulerian), and LSD.
-All use uniform_upper_triangle sampling.
+Algorithmic comparison on the two-dimensional checker dataset.
 """
 
 import ml_collections

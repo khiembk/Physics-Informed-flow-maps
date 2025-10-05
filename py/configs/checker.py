@@ -1,8 +1,5 @@
 """
-Checker dataset comparison of different loss methods.
-Comparing LSD (convex stopgrad) with PSD (uniform vs midpoint) and ESD.
-All use uniform_upper_triangle sampling with no annealing.
-Uses latest algorithmic parameters from CelebA/CIFAR experiments.
+Algorithmic comparison on the two-dimensional checker dataset.
 """
 
 import ml_collections

@@ -1,3 +1,7 @@
+"""
+Algorithmic comparison on the CelebA-64 dataset.
+"""
+
 import ml_collections
 
 experiments = [

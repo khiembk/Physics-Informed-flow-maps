@@ -1,3 +1,7 @@
+"""
+Algorithmic comparison on the AFHQ-64 dataset.
+"""
+
 import ml_collections
 
 # Define experiments as tuples: (loss_type, psd_type, stopgrad_type)
@@ -70,7 +74,9 @@ def get_config(
     # Create systematic name for the experiment
     method_str = f"{loss_type}_{psd_type}" if psd_type else loss_type
 
-    config.logging.wandb_name = f"afhq64_{method_str}_stopgrad_{stopgrad_type}_diag75_bs256_9_30"
+    config.logging.wandb_name = (
+        f"afhq64_{method_str}_stopgrad_{stopgrad_type}_diag75_bs256_9_30"
+    )
     config.logging.wandb_entity = "boffi"
     config.logging.output_folder = output_folder
     config.logging.output_name = config.logging.wandb_name
