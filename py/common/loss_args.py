@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Code for setting up arguments for loss functions.
 """
@@ -37,14 +37,12 @@ def _sample_triangle(
     bs: int,
     tmin: float,
     tmax: float,
-    delta: float,
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-    """Sample uniformly from upper triangle with optional delta constraint."""
+    """Sample uniformly from upper triangle."""
     temp1 = jax.random.uniform(key1, shape=(bs,), minval=tmin, maxval=tmax)
     temp2 = jax.random.uniform(key2, shape=(bs,), minval=tmin, maxval=tmax)
     s = jnp.minimum(temp1, temp2)
     t = jnp.maximum(temp1, temp2)
-    s = jnp.maximum(s, t - delta)  # Enforce |t-s| <= delta
     return s, t
 
 
@@ -74,13 +72,11 @@ def _concat_diag_offdiag(
     return sbatch, tbatch
 
 
-@functools.partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
+@functools.partial(jax.jit, static_argnums=(1, 2, 3, 4))
 def get_loss_fn_args_randomness(
     prng_key: jnp.ndarray,
-    curr_iter: int,
     cfg: config_dict.ConfigDict,
     sample_rho0: Callable,
-    anneal_schedule: Callable,
     diag_bs: int,
     offdiag_bs: int,
 ) -> Tuple:
@@ -93,25 +89,23 @@ def get_loss_fn_args_randomness(
         tkey2,
     ) = jax.random.split(prng_key, num=5)
     x0batch = sample_rho0(cfg.optimization.bs, x0key)
-    delta = anneal_schedule(curr_iter)
 
     bs = cfg.optimization.bs
     tmin = cfg.training.tmin
     tmax = cfg.training.tmax
 
-    # If offdiag_bs is 0, we're in velocity mode (full batch on diagonal)
+    # If offdiag_bs is 0, use full batch on diagonal
     if offdiag_bs == 0:
         sbatch, tbatch = _sample_diagonal(skey, bs, tmin, tmax)
     else:
-        # Use uniform upper triangle sampling
-        # sample diagonal and off-diagonal portions
+        # sample diagonal and off-diagonal points
         s_diag, t_diag = (
             _sample_diagonal(skey, diag_bs, tmin, tmax)
             if diag_bs > 0
             else (jnp.array([]), jnp.array([]))
         )
         s_offdiag, t_offdiag = (
-            _sample_triangle(tkey, tkey2, offdiag_bs, tmin, tmax, delta)
+            _sample_triangle(tkey, tkey2, offdiag_bs, tmin, tmax)
             if offdiag_bs > 0
             else (jnp.array([]), jnp.array([]))
         )
@@ -120,7 +114,7 @@ def get_loss_fn_args_randomness(
 
     if cfg.training.psd_type == "midpoint":
         ubatch = 0.5 * (sbatch + tbatch)
-        hbatch = (tbatch - sbatch) / 2.0
+        hbatch = None  # Not used for midpoint interpolation
     elif cfg.training.psd_type == "uniform":
         minval = 0.0
         maxval = 1.0
@@ -156,8 +150,8 @@ def get_batch(
 ) -> int:
     """Extract a batch based on the structure expected for image
     or non-image datasets."""
-    is_image_dataset = (
-        (cfg.problem.target in ["cifar10", "celeb_a"]) or ("afhq" in cfg.problem.target)
+    is_image_dataset = (cfg.problem.target in ["cifar10", "celeb_a"]) or (
+        "afhq" in cfg.problem.target
     )
 
     batch = next(statics.ds)
@@ -190,22 +184,13 @@ def get_loss_fn_args(
     statics: state_utils.StaticArgs,
     train_state: state_utils.EMATrainState,
     prng_key: jnp.ndarray,
-    force_return_diagonal_args: bool = False,
-    force_return_full_args: bool = False,
 ) -> Tuple:
 
-    # Determine batch sizes based on whether we're in velocity mode
+    # Determine batch sizes based on splitting configuration
     bs = cfg.optimization.bs
-    step = dist_utils.safe_index(cfg, train_state.step)
 
-    # Check if we should use velocity loss (includes interpolant annealing)
-    if state_utils.use_velocity_loss(cfg, step):
-        # Full batch on diagonal for velocity training
-        diag_bs = bs
-        offdiag_bs = 0
-    else:
-        # Normal batch splitting
-        diag_bs, offdiag_bs = _get_diag_offdiag_bs(cfg, bs)
+    # Normal batch splitting
+    diag_bs, offdiag_bs = _get_diag_offdiag_bs(cfg, bs)
 
     # drew randomness needed for the objective
     (
@@ -218,10 +203,8 @@ def get_loss_fn_args(
         prng_key,
     ) = get_loss_fn_args_randomness(
         prng_key,
-        step,
         cfg,
         statics.sample_rho0,
-        statics.anneal_schedule,
         diag_bs,
         offdiag_bs,
     )
@@ -235,13 +218,8 @@ def get_loss_fn_args(
     else:
         teacher_params = train_state.params
 
-    # for training interpolant alone
-    diagonal_args = dist_utils.replicate_loss_fn_args(
-        cfg, (x0batch, x1batch, label_batch, tbatch, dropout_keys)
-    )
-
     # for training flow map
-    full_loss_args = (
+    loss_fn_args = (
         x0batch,
         x1batch,
         label_batch,
@@ -251,18 +229,7 @@ def get_loss_fn_args(
         hbatch,
         dropout_keys,
     )
-    full_loss_args = dist_utils.replicate_loss_fn_args(cfg, full_loss_args)
-    full_loss_args = (teacher_params, *full_loss_args)
-
-    # switches to enable compilation
-    if force_return_diagonal_args:
-        loss_fn_args = diagonal_args
-    elif force_return_full_args:
-        loss_fn_args = full_loss_args
-    else:
-        if state_utils.use_velocity_loss(cfg, dist_utils.safe_index(cfg, train_state.step)):
-            loss_fn_args = diagonal_args
-        else:
-            loss_fn_args = full_loss_args
+    loss_fn_args = dist_utils.replicate_loss_fn_args(cfg, loss_fn_args)
+    loss_fn_args = (teacher_params, *loss_fn_args)
 
     return loss_fn_args, prng_key

@@ -52,43 +52,6 @@ Parameters = Dict[str, Dict]
 mpl.rc_file(f"{pathlib.Path(__file__).resolve().parent}/matplotlibrc")
 
 
-def get_loss(
-    cfg: config_dict.ConfigDict,
-    statics: state_utils.StaticArgs,
-    train_state: state_utils.EMATrainState,
-) -> jnp.ndarray:
-    if state_utils.use_velocity_loss(cfg, dist_utils.safe_index(cfg, train_state.step)):
-        return statics.interp_loss
-    else:
-        return statics.loss
-
-
-def force_compile(
-    cfg: config_dict.ConfigDict,
-    statics: state_utils.StaticArgs,
-    train_state: state_utils.EMATrainState,
-    prng_key: np.ndarray,
-) -> None:
-    """Force compile both loss functions to check memory issues."""
-
-    print("Compiling diagonal (interpolant) loss.")
-    loss_fn_args, prng_key = statics.get_loss_fn_args(
-        cfg, statics, train_state, prng_key, force_return_diagonal_args=True
-    )
-
-    train_state, loss_value, grads = statics.train_step(
-        train_state, statics.interp_loss, loss_fn_args
-    )
-
-    print("Compiling full loss.")
-    loss_fn_args, prng_key = statics.get_loss_fn_args(
-        cfg, statics, train_state, prng_key, force_return_full_args=True
-    )
-    train_state, loss_value, grads = statics.train_step(train_state, statics.loss, loss_fn_args)
-
-    return loss_fn_args, train_state, loss_value, grads, prng_key
-
-
 def train_loop(
     cfg: config_dict.ConfigDict,
     statics: state_utils.StaticArgs,
@@ -96,13 +59,6 @@ def train_loop(
     prng_key: np.ndarray,
 ) -> None:
     """Carry out the training loop."""
-
-    # compile up front to avoid memory surprises
-    start_time = time.time()
-    loss_fn_args, train_state, loss_value, grads, prng_key = force_compile(
-        cfg, statics, train_state, prng_key
-    )
-    end_time = time.time()
 
     pbar = tqdm(range(cfg.optimization.total_steps))
     for _ in pbar:
@@ -112,7 +68,7 @@ def train_loop(
 
         # take a step on the loss
         train_state, loss_value, grads = statics.train_step(
-            train_state, get_loss(cfg, statics, train_state), loss_fn_args
+            train_state, statics.loss, loss_fn_args
         )
         end_time = time.time()
 
@@ -155,22 +111,6 @@ def setup_config_dict():
     return cfg_module.get_config(args.slurm_id, args.dataset_location, args.output_folder)
 
 
-def setup_annealing_schedule(cfg: config_dict.ConfigDict) -> optax.Schedule:
-    """
-    Set up annealing schedule for time sampling.
-
-    Delta controls maximum allowed gap: |t - s| <= delta
-
-    Since all configs use constant full triangle sampling (no annealing),
-    this always returns a constant schedule of tmax - tmin.
-    """
-    # Get the full delta value (maximum gap for full triangle)
-    full_delta = cfg.training.tmax - cfg.training.tmin
-
-    # Always use constant full triangle (no annealing)
-    return optax.schedules.constant_schedule(full_delta)
-
-
 def setup_state(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray) -> Tuple[
     config_dict.ConfigDict,
     state_utils.StaticArgs,
@@ -195,11 +135,8 @@ def setup_state(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray) -> Tuple[
         prng_key,
     )
 
-    # setup annealing schedule
-    anneal_schedule = setup_annealing_schedule(cfg)
-
-    # define the losses
-    loss, interp_loss = losses.setup_loss(cfg, net, interp)
+    # define the loss
+    loss = losses.setup_loss(cfg, net, interp)
 
     # initialize FID network if FID computation is enabled
     inception_fn = None
@@ -212,9 +149,7 @@ def setup_state(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray) -> Tuple[
     statics = state_utils.StaticArgs(
         net=net,
         schedule=schedule,
-        anneal_schedule=anneal_schedule,
         loss=loss,
-        interp_loss=interp_loss,
         get_loss_fn_args=loss_args.get_loss_fn_args,
         train_step=updates.setup_train_step(cfg),
         update_ema_params=updates.setup_ema_update(cfg),

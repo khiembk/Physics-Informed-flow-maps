@@ -32,9 +32,7 @@ class EMATrainState(train_state.TrainState):
 class StaticArgs(NamedTuple):
     net: nn.Module
     schedule: optax.Schedule
-    anneal_schedule: optax.Schedule
     loss: Callable
-    interp_loss: Callable
     get_loss_fn_args: Callable
     train_step: Callable
     update_ema_params: Callable
@@ -142,17 +140,3 @@ def setup_training_state(
     return train_state, net, schedule, prng_key
 
 
-def use_velocity_loss(cfg: config_dict.ConfigDict, step: int) -> bool:
-    """Check if velocity loss should be used at a specific training step.
-
-    This includes the interpolant annealing phase.
-    """
-    # Support both old and new parameter names
-    if hasattr(cfg.training, "interpolant_steps"):
-        # New decoupled parameters
-        interpolant_steps = cfg.training.interpolant_steps
-    else:
-        # Fall back to legacy behavior
-        interpolant_steps = cfg.training.anneal_steps
-
-    return cfg.training.interp_anneal and step <= interpolant_steps

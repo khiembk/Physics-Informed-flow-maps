@@ -299,14 +299,12 @@ def log_metrics(
     loss_value = dist_utils.safe_index(cfg, jnp.array(loss_value))
     step = dist_utils.safe_index(cfg, train_state.step)
     learning_rate = statics.schedule(step)
-    anneal_s = statics.anneal_schedule(step)
 
     # Standard metrics
     metrics = {
         f"loss": loss_value,
         f"grad": compute_grad_norm(grads),
         f"learning_rate": learning_rate,
-        f"anneal_schedule": anneal_s,
         f"step_time": step_time,
     }
 
@@ -541,22 +539,11 @@ def make_loss_fn_args_plot(
     loss_fn_args: Tuple,
 ) -> None:
     """Make a plot of the loss function arguments."""
-    if state_utils.use_velocity_loss(cfg, dist_utils.safe_index(cfg, train_state.step)):
-        # unpack the interpolant loss arguments
-        (
-            x0batch,
-            x1batch,
-            _,
-            tbatch,
-            _,
-        ) = dist_utils.unreplicate_loss_fn_args(cfg, loss_fn_args)
-        sbatch = tbatch
-    else:
-        # unpack the interpolant loss arguments
-        data_args = loss_fn_args[1:]
-        (x0batch, x1batch, _, sbatch, tbatch, _, _, _) = (
-            dist_utils.unreplicate_loss_fn_args(cfg, data_args)
-        )
+    # unpack the full loss arguments
+    data_args = loss_fn_args[1:]
+    (x0batch, x1batch, _, sbatch, tbatch, _, _, _) = (
+        dist_utils.unreplicate_loss_fn_args(cfg, data_args)
+    )
 
     # remove pmap reshaping
     x0batch = jnp.squeeze(x0batch)

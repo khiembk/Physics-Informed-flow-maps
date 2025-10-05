@@ -301,8 +301,8 @@ def esd_term(
 
 def setup_loss(
     cfg: config_dict.ConfigDict, net: flow_map.FlowMap, interp: interpolant.Interpolant
-) -> Tuple[Callable, Callable]:
-    """Setup the loss functions."""
+) -> Callable:
+    """Setup the loss function."""
 
     print(f"Setting up loss: {cfg.training.loss_type}")
     print(f"Stopgrad type: {cfg.training.stopgrad_type}")
@@ -422,4 +422,4 @@ def setup_loss(
         # Normalize by total batch size
         return total_loss / total_bs
 
-    return loss, diagonal_only_loss
+    return loss
