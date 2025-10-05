@@ -1,12 +1,11 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Code for initializing common datasets.
 """
 
 import functools
-import os
 from typing import Callable, Dict
 
 import jax
@@ -63,19 +62,6 @@ def preprocess_image(cfg, x: Dict) -> Dict:
     image = tf.transpose(image, [2, 0, 1])
 
     return {"image": image, "label": label}
-
-
-def random_flip_chw(x: Dict, seed=None):
-    """Apply random horizontal flip to an image in CHW format."""
-    # For CHW format, we flip along axis 2 (width dimension)
-    random_value = tf.random.uniform([], 0, 1.0, seed=seed)
-    x["image"] = tf.cond(
-        random_value < 0.5,
-        lambda: tf.reverse(x["image"], axis=[2]),  # Flip along width axis
-        lambda: x["image"],  # No flip
-    )
-
-    return x
 
 
 def get_image_dataset(cfg: config_dict.ConfigDict):
@@ -180,19 +166,7 @@ def np_to_tfds(cfg: config_dict.ConfigDict, x1s: np.ndarray) -> tf.data.Dataset:
 
 def setup_target(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
     """Set up the target density for the system."""
-    if "gmm" in cfg.problem.target:
-        weights, means, covs = gmm.setup_gmm(cfg.problem.target, cfg.problem.d)
-        sample_rho1 = functools.partial(
-            gmm.sample_gmm, weights=weights, means=means, covariances=covs
-        )
-        n_samples = cfg.problem.n
-        keys = jax.random.split(prng_key, num=(cfg.problem.n + 1))
-        x1s = sample_rho1(n_samples, keys)
-        rescale_value = float(np.std(x1s))
-        ds = np_to_tfds(cfg, x1s)
-        prng_key = jax.random.split(keys[-1])[0]
-
-    elif cfg.problem.target == "checker":
+    if cfg.problem.target == "checker":
         assert cfg.problem.d == 2, "Checkerboard only implemented for d=2."
 
         @functools.partial(jax.jit, static_argnums=(0,))
