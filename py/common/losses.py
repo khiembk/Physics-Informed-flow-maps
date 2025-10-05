@@ -1,6 +1,6 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
 Loss functions for learning.
 """
@@ -163,7 +163,6 @@ def lsd_term(
     interp: interpolant.Interpolant,
     X: flow_map.FlowMap,
     stopgrad_type: str,
-    rescale_lsd: bool,
 ) -> float:
     """Compute the LSD term of the loss."""
     Is = interp.calc_It(s, x0, x1)
@@ -200,12 +199,7 @@ def lsd_term(
         raise ValueError(f"Invalid stopgrad_type: {stopgrad_type}")
 
     weight_st = X.apply(params, s, t, method="calc_weight")
-
-    if rescale_lsd:
-        error = (b_eval - dt_Xst) / (t - s)
-    else:
-        error = b_eval - dt_Xst
-
+    error = b_eval - dt_Xst
     lsd_loss = jnp.sum(error**2)
     return jnp.exp(-weight_st) * lsd_loss + weight_st
 
@@ -305,106 +299,6 @@ def esd_term(
     return jnp.exp(-weight_st) * esd_loss + weight_st
 
 
-def self_distill(
-    params: Parameters,
-    teacher_params: Parameters,
-    x0: jnp.ndarray,
-    x1: jnp.ndarray,
-    label: jnp.ndarray,
-    s: float,
-    t: float,
-    u: float,
-    h: float,
-    key: jnp.ndarray,
-    *,
-    interp: interpolant.Interpolant,
-    X: flow_map.FlowMap,
-    calc_both_diagonals: bool,
-    stopgrad_type: str,
-    loss_type: str,
-    rescale_lsd: bool,
-    psd_type: str,
-) -> float:
-    """Self student-teacher approach."""
-    rng = {"dropout": key}
-
-    vel_loss = diagonal_term(
-        params,
-        x0,
-        x1,
-        label,
-        t,
-        rng,
-        interp=interp,
-        X=X,
-    )
-
-    if calc_both_diagonals:
-        # compute the diagonal term for the second time
-        vel_loss += diagonal_term(
-            params,
-            x0,
-            x1,
-            label,
-            s,
-            rng,
-            interp=interp,
-            X=X,
-        )
-        vel_loss /= 2.0
-
-    if loss_type == "psd":
-        distill_loss = psd_term(
-            params,
-            teacher_params,
-            x0,
-            x1,
-            label,
-            s,
-            t,
-            u,
-            h,
-            rng,
-            interp=interp,
-            X=X,
-            psd_type=psd_type,
-            stopgrad_type=stopgrad_type,
-        )
-    elif loss_type == "lsd":
-        distill_loss = lsd_term(
-            params,
-            teacher_params,
-            x0,
-            x1,
-            label,
-            s,
-            t,
-            rng,
-            interp=interp,
-            X=X,
-            stopgrad_type=stopgrad_type,
-            rescale_lsd=rescale_lsd,
-        )
-    elif loss_type == "esd":
-        distill_loss = esd_term(
-            params,
-            teacher_params,
-            x0,
-            x1,
-            label,
-            s,
-            t,
-            rng,
-            interp=interp,
-            X=X,
-            stopgrad_type=stopgrad_type,
-        )
-    else:
-        raise ValueError(f"Unknown loss_type: {loss_type}")
-
-    return vel_loss + distill_loss
-
-
 def setup_loss(
     cfg: config_dict.ConfigDict, net: flow_map.FlowMap, interp: interpolant.Interpolant
 ) -> Tuple[Callable, Callable]:
@@ -412,32 +306,6 @@ def setup_loss(
 
     print(f"Setting up loss: {cfg.training.loss_type}")
     print(f"Stopgrad type: {cfg.training.stopgrad_type}")
-
-    # Shared batch loss (original behavior)
-    @mean_reduce
-    @functools.partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0, 0, 0, 0))
-    def shared_batch_loss(
-        params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
-    ):
-        return self_distill(
-            params,
-            teacher_params,
-            x0,
-            x1,
-            label,
-            s,
-            t,
-            u,
-            h,
-            dropout_keys,
-            interp=interp,
-            X=net,
-            calc_both_diagonals=cfg.training.calc_both_diagonals,
-            stopgrad_type=cfg.training.stopgrad_type,
-            loss_type=cfg.training.loss_type,
-            rescale_lsd=cfg.training.rescale_lsd,
-            psd_type=cfg.training.psd_type,
-        )
 
     # Pure diagonal loss
     @mean_reduce
@@ -492,7 +360,6 @@ def setup_loss(
                 interp=interp,
                 X=net,
                 stopgrad_type=cfg.training.stopgrad_type,
-                rescale_lsd=cfg.training.rescale_lsd,
             )
         elif cfg.training.loss_type == "esd":
             return esd_term(
@@ -511,10 +378,7 @@ def setup_loss(
         else:
             raise ValueError(f"Unknown loss_type: {cfg.training.loss_type}")
 
-    # Split batch wrapper (no vmap/mean_reduce, handles that internally)
-    def split_batch_loss(
-        params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
-    ):
+    def loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys):
         """Split batch into diagonal and off-diagonal portions."""
         diag_bs = cfg.training.diag_bs
         total_bs = x0.shape[0]
@@ -558,19 +422,4 @@ def setup_loss(
         # Normalize by total batch size
         return total_loss / total_bs
 
-    # Main loss function that routes based on diagfac
-    def loss(params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys):
-        """Unified loss interface that routes to shared or split batch based on config."""
-        if not hasattr(cfg.training, "diag_bs"):
-            # Use shared batch (original behavior)
-            return shared_batch_loss(
-                params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
-            )
-        else:
-            # Use split batch
-            return split_batch_loss(
-                params, teacher_params, x0, x1, label, s, t, u, h, dropout_keys
-            )
-
-    # Return the routing loss and diagonal-only for interp_loss
     return loss, diagonal_only_loss
