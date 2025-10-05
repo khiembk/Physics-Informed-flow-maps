@@ -1,8 +1,8 @@
 """
 Nicholas M. Boffi
-3/20/25
+10/5/25
 
-Code for lagrangian map matching / self-distillation.
+Main training loop for self-distillation of flow maps.
 """
 
 # isort: off
@@ -42,11 +42,9 @@ import jax
 import jax.numpy as jnp
 import matplotlib as mpl
 import numpy as np
-import optax
+import wandb
 from ml_collections import config_dict  # type: ignore
 from tqdm.auto import tqdm as tqdm
-
-import wandb
 
 Parameters = Dict[str, Dict]
 mpl.rc_file(f"{pathlib.Path(__file__).resolve().parent}/matplotlibrc")
@@ -64,7 +62,9 @@ def train_loop(
     for _ in pbar:
         # construct loss function arguments
         start_time = time.time()
-        loss_fn_args, prng_key = statics.get_loss_fn_args(cfg, statics, train_state, prng_key)
+        loss_fn_args, prng_key = statics.get_loss_fn_args(
+            cfg, statics, train_state, prng_key
+        )
 
         # take a step on the loss
         train_state, loss_value, grads = statics.train_step(
@@ -108,7 +108,9 @@ def parse_command_line_arguments():
 def setup_config_dict():
     args = parse_command_line_arguments()
     cfg_module = importlib.import_module(args.cfg_path)
-    return cfg_module.get_config(args.slurm_id, args.dataset_location, args.output_folder)
+    return cfg_module.get_config(
+        args.slurm_id, args.dataset_location, args.output_folder
+    )
 
 
 def setup_state(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray) -> Tuple[
