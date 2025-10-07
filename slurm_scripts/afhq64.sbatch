@@ -18,7 +18,7 @@ mkdir -p /n/netscratch/albergo_lab/Everyone/nmboffi/afhq64/logs
 ## Configuration with updated paths
 PY_DIR=/n/home04/nboffi/flow-maps/py
 CONFIG_PATH="configs.afhq64"
-DATASET_LOCATION="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/datasets"
+DATASET_LOCATION="/n/netscratch/albergo_lab/Everyone/nmboffi"
 OUTPUT_FOLDER="/n/netscratch/albergo_lab/Everyone/nmboffi/afhq64"
 
 # Map array task ID to experiment

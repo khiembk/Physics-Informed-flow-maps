@@ -18,7 +18,7 @@ mkdir -p /n/holylabs/LABS/albergo_lab/Everyone/nmboffi/lmm/celeba/logs
 ## Configuration
 PY_DIR=/n/home04/nboffi/flow-maps/py
 CONFIG_PATH="configs.celeba64"
-DATASET_LOCATION="/n/netscratch/albergo_lab/Everyone"
+DATASET_LOCATION="/n/netscratch/albergo_lab/Everyone/nmboffi"
 OUTPUT_FOLDER="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/lmm/celeba"
 
 # Map array task ID to experiment

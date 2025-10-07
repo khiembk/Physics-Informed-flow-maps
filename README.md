@@ -155,6 +155,76 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python py/launchers/learn.py --cfg_path configs.cif
 ```
 
 
+## SLURM cluster deployment
+
+For large-scale experiments, SLURM batch scripts are provided in `slurm_scripts/`:
+
+```bash
+# Submit all 4 experiments as array job
+sbatch slurm_scripts/cifar10.sbatch
+sbatch slurm_scripts/celeba.sbatch
+sbatch slurm_scripts/afhq64.sbatch
+sbatch slurm_scripts/checker.sbatch
+
+# FID computation for trained models
+sbatch slurm_scripts/cifar10_fid.sbatch
+sbatch slurm_scripts/celeba_fid.sbatch
+sbatch slurm_scripts/afhq64_fid.sbatch
+```
+
+**Important**: These scripts are configured for our specific cluster (FASRC at Harvard). You will need to modify:
+- Account/partition names (`#SBATCH --account`, `#SBATCH --partition`)
+- Module loading commands (`module load`)
+- Conda environment paths and activation
+- Dataset and output directory paths
+- Time limits and memory requirements based on your hardware
+
+The array job structure (`--array=0-3`) runs all 4 experiments (LSD, PSD-uniform, PSD-midpoint, ESD) in parallel.
+
+
+## Weights & Biases logging
+
+This codebase uses [Weights & Biases](https://wandb.ai) for experiment tracking and visualization.
+
+### Setup
+
+1. **Create a WandB account** at [wandb.ai](https://wandb.ai)
+
+2. **Login** on your machine:
+```bash
+wandb login
+```
+
+3. **Configure your entity**: Set an environment variable with your WandB username:
+```bash
+export WANDB_ENTITY="your-username"
+```
+
+### Disabling WandB
+
+To train without WandB logging:
+```bash
+export WANDB_MODE=offline
+python py/launchers/learn.py --cfg_path configs.cifar10 --slurm_id 0
+```
+
+Or disable completely:
+```bash
+export WANDB_DISABLED=true
+python py/launchers/learn.py --cfg_path configs.cifar10 --slurm_id 0
+```
+
+### Logging structure
+
+- **Project**: Experiments log to the project specified in config (default: `self-distill-flow-maps`)
+- **Run names**: Automatically generated from dataset, loss type, and hyperparameters
+- **Metrics logged**:
+  - Training loss (total, diagonal, off-diagonal components)
+  - FID scores at multiple sampling steps (1, 2, 4, 8, 16)
+  - Learning rate, gradient norms
+  - Sample visualizations every 5k steps
+
+
 ## Project structure
 
 ```
