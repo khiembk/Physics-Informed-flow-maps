@@ -18,7 +18,7 @@ mkdir -p /n/holylabs/LABS/albergo_lab/Everyone/nmboffi/lmm/cifar10/logs
 ## Configuration
 PY_DIR=/n/home04/nboffi/flow-maps/py
 CONFIG_PATH="configs.cifar10"
-DATASET_LOCATION="/n/netscratch/albergo_lab/Everyone/nmboffi"
+DATASET_LOCATION="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/datasets"
 OUTPUT_FOLDER="/n/holylabs/LABS/albergo_lab/Everyone/nmboffi/lmm/cifar10"
 
 # Map array task ID to experiment
