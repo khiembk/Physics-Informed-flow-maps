@@ -5,6 +5,7 @@ Nicholas M. Boffi
 Algorithmic comparison on the two-dimensional checker dataset.
 """
 
+import os
 import ml_collections
 
 # Define experiments as tuples: (loss_type, psd_type, stopgrad_type)
@@ -78,7 +79,7 @@ def get_config(
     method_str = f"{loss_type}_{psd_type}" if psd_type else loss_type
 
     config.logging.wandb_name = f"cifar10_paper_{method_str}"
-    config.logging.wandb_entity = "boffi"
+    config.logging.wandb_entity = os.getenv("WANDB_ENTITY", "your-username")
     config.logging.output_folder = output_folder
     config.logging.output_name = config.logging.wandb_name
 

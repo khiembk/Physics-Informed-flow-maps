@@ -5,6 +5,7 @@ Nicholas M. Boffi
 Algorithmic comparison on the CelebA-64 dataset.
 """
 
+import os
 import ml_collections
 
 experiments = [
@@ -75,7 +76,7 @@ def get_config(
     method_str = f"{loss_type}_{psd_type}" if psd_type else loss_type
 
     config.logging.wandb_name = f"celeba_paper_{method_str}"
-    config.logging.wandb_entity = "boffi"
+    config.logging.wandb_entity = os.getenv("WANDB_ENTITY", "your-username")
     config.logging.output_folder = output_folder
     config.logging.output_name = config.logging.wandb_name
 
