@@ -67,8 +67,10 @@ module load gcc/12.2.0-fasrc01
 
 # Hook conda/mamba into the shell and activate env
 source "$(conda info --base)/etc/profile.d/conda.sh"
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 conda activate jax_3_17_25
+
+# Fix library path to prioritize conda environment libraries over system ones
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 # Change to project directory
 cd $PY_DIR || exit
