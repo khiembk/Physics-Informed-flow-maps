@@ -11,6 +11,8 @@
 
 by Nicholas M. Boffi (CMU), Michael Albergo (Harvard), and Eric Vanden-Eijnden (Courant Institute of Mathematical Sciences, Capital Fund Management)
 
+Project Page: https://flow-maps.github.io
+
 ## Background
 
 Flow maps are a new class of generative models that generalize consistency models, enabling the generation of samples in just one or a few forward passes of the learned network. 
