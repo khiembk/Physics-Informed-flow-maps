@@ -268,6 +268,16 @@ If you found this repository useful or the associated paper interesting, please 
       primaryClass={cs.LG},
       url={https://arxiv.org/abs/2505.18825},
 }
+
+@misc{boffi2025flowmapmatchingstochastic,
+  title={Flow map matching with stochastic interpolants: A mathematical framework for consistency models},
+  author={Nicholas M. Boffi and Michael S. Albergo and Eric Vanden-Eijnden},
+  year={2025},
+  eprint={2406.07507},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2406.07507},
+}
 ```
 
 
