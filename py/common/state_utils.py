@@ -38,7 +38,6 @@ class StaticArgs(NamedTuple):
     ds: tf.data.Dataset
     interp: interpolant.Interpolant
     sample_rho0: Callable
-    inception_fn: Callable = None  # For FID computation
 
 
 def load_checkpoint(

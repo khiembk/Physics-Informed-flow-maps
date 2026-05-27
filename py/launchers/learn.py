@@ -31,7 +31,6 @@ from typing import Dict, Tuple
 
 import common.datasets as datasets
 import common.dist_utils as dist_utils
-import common.fid_utils as fid_utils
 import common.interpolant as interpolant
 import common.logging as logging
 import common.loss_args as loss_args
@@ -140,13 +139,6 @@ def setup_state(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray) -> Tuple[
     # define the loss
     loss = losses.setup_loss(cfg, net, interp)
 
-    # initialize FID network if FID computation is enabled
-    inception_fn = None
-    if hasattr(cfg.logging, "fid_freq") and cfg.logging.fid_freq > 0:
-        print("Initializing Inception network for FID computation...")
-        inception_fn = fid_utils.get_fid_network()
-        print("Inception network initialized.")
-
     # define static object
     statics = state_utils.StaticArgs(
         net=net,
@@ -158,7 +150,6 @@ def setup_state(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray) -> Tuple[
         ds=ds,
         interp=interp,
         sample_rho0=datasets.setup_base(cfg, ex_input),
-        inception_fn=inception_fn,
     )
 
     train_state = dist_utils.safe_replicate(cfg, train_state)

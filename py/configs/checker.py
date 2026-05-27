@@ -87,13 +87,6 @@ def get_config(
     config.logging.output_folder = output_folder
     config.logging.output_name = config.logging.wandb_name
 
-    # FID not relevant for checker
-    config.logging.fid_freq = 0
-    config.logging.fid_stats_path = None
-    config.logging.fid_n_samples = None
-    config.logging.fid_batch_size = None
-    config.logging.fid_n_steps_flow = None
-    config.logging.fid_ema_factor = None
     config.logging.visual_ema_factor = None
 
     # network config - 4-layer 512-neuron MLP (standard for checker)

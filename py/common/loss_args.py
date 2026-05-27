@@ -148,19 +148,9 @@ def get_loss_fn_args_randomness(
 def get_batch(
     cfg: config_dict.ConfigDict, statics: state_utils.StaticArgs, prng_key: jnp.ndarray
 ) -> int:
-    """Extract a batch based on the structure expected for image
-    or non-image datasets."""
-    is_image_dataset = (cfg.problem.target in ["cifar10", "celeb_a"]) or (
-        "afhq" in cfg.problem.target
-    )
-
-    batch = next(statics.ds)
-    if is_image_dataset:
-        x1batch = batch["image"]
-        label_batch = batch["label"]
-    else:
-        x1batch = batch
-        label_batch = None
+    """Extract a batch from the dataset."""
+    x1batch = next(statics.ds)
+    label_batch = None
 
     # add droput to randomly replace fraction cfg.class_dropout of labels by num_classes
     # if not conditional, we don't need the labels

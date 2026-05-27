@@ -1,8 +1,5 @@
 """
-Nicholas M. Boffi
-10/5/25
-
-Code for initializing common datasets.
+Code for initializing datasets.
 """
 
 import functools
@@ -12,94 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import tensorflow as tf
-import tensorflow_datasets as tfds
 from ml_collections import config_dict
-
-
-def unnormalize_image(image: jnp.ndarray):
-    """Unnormalize an image from [-1, 1] to [0, 1] by scaling and clipping."""
-    image = (image + 1) / 2
-    image = jnp.clip(image, 0.0, 1.0)
-    return image
-
-
-def normalize_image_tf(image: tf.Tensor):
-    """Normalize an image to have pixel values in the range [-1, 1]."""
-    return (2 * (image / 255)) - 1
-
-
-def preprocess_celeb_a(image: tf.Tensor) -> tf.Tensor:
-    """Crop an image to 140x140, then resize to 64x64 pixels."""
-    image = normalize_image_tf(image)
-    crop = tf.image.resize_with_crop_or_pad(image, 140, 140)
-    crop64 = tf.image.resize(crop, [64, 64], method="area", antialias=True)
-    return crop64
-
-
-def preprocess_image(cfg, x: Dict) -> Dict:
-    """Preprocess the image for TensorFlow datasets."""
-    image = x["image"]
-
-    if cfg.problem.target == "celeb_a":
-        # celeb_a doesn't have labels; artificially pad them all to 1
-        label = 1.0
-    else:
-        label = x["label"]
-
-    image = tf.cast(image, tf.float32)
-    label = tf.cast(label, tf.float32)
-
-    if cfg.problem.target == "cifar10" or "afhq" in cfg.problem.target:
-        image = normalize_image_tf(image)
-    elif cfg.problem.target == "celeb_a":
-        image = preprocess_celeb_a(image)
-    else:
-        raise ValueError("Unknown dataset type.")
-
-    # ensure (N, C, H, W)
-    image = tf.transpose(image, [2, 0, 1])
-
-    return {"image": image, "label": label}
-
-
-def get_image_dataset(cfg: config_dict.ConfigDict):
-    """Assemble a TensorFlow dataset for the specified problem target."""
-    small_image_datasets = ["cifar10", "celeb_a"]
-    is_small_image_dataset = cfg.problem.target in small_image_datasets
-    is_afhq = "afhq" in cfg.problem.target
-
-    if is_small_image_dataset:
-        if cfg.problem.target == "cifar10":
-            ds = tfds.load(
-                "cifar10",
-                split="train",
-                shuffle_files=True,
-                data_dir=cfg.problem.dataset_location,
-            )
-        elif cfg.problem.target == "celeb_a":
-            ds = tfds.load(
-                "celeb_a",
-                split="train",
-                shuffle_files=True,
-                data_dir=cfg.problem.dataset_location,
-            )
-    elif is_afhq:
-        load_str = f"{cfg.problem.dataset_location}/{cfg.problem.target}"
-        ds = tf.data.experimental.load(load_str)
-
-    ds = (
-        ds.shuffle(10_000, reshuffle_each_iteration=True)
-        .map(
-            lambda x: preprocess_image(cfg, x),
-            num_parallel_calls=tf.data.AUTOTUNE,
-        )
-        .repeat()
-        .batch(cfg.optimization.bs)
-        .prefetch(tf.data.AUTOTUNE)
-        .as_numpy_iterator()
-    )
-
-    return ds
 
 
 def sample_checkerboard(
@@ -114,20 +24,14 @@ def sample_checkerboard(
     samples = np.array([]).reshape((0, 2))
 
     while total_samples < n_samples:
-        # Generate uniform samples on unit square
-        curr_samples = np.random.rand(
-            n_samples * 2, 2
-        )  # Generate extra to account for filtering
+        curr_samples = np.random.rand(n_samples * 2, 2)
 
-        # Determine which square each point falls into
         x_idx = (curr_samples[:, 0] * n_squares).astype(int)
         y_idx = (curr_samples[:, 1] * n_squares).astype(int)
 
-        # Keep points that fall in "white squares" of checkerboard
         mask = (x_idx + y_idx) % 2 == 0
         curr_samples = curr_samples[mask]
 
-        # Take only what we need
         samples = np.concatenate((samples, curr_samples))
         total_samples = samples.shape[0]
 
@@ -177,28 +81,11 @@ def setup_target(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
         rescale_value = float(np.std(x1s))
         ds = np_to_tfds(cfg, x1s)
 
-    elif (
-        cfg.problem.target == "cifar10"
-        or cfg.problem.target == "celeb_a"
-        or "afhq" in cfg.problem.target
-    ):
-        ds = get_image_dataset(cfg)
-        print("Loaded image dataset.")
-
     else:
-        raise ValueError("Specified target density is not implemented.")
+        raise ValueError(f"Unknown target density: {cfg.problem.target!r}. "
+                         "Add a custom dataset loader here.")
 
-    # compute standard deviation of the dataset
     if cfg.problem.gaussian_scale == "adaptive":
-        # hard code
-        if (
-            cfg.problem.target == "cifar10"
-            or cfg.problem.target == "celeb_a"
-            or "afhq" in cfg.problem.target
-        ):
-            rescale_value = 0.5
-
-        # for generated datasets, it's computed above
         cfg.network.rescale = rescale_value
     else:
         cfg.network.rescale = 1.0
