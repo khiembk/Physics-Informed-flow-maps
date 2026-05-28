@@ -1,0 +1,140 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{multirow}
+\usepackage{natbib}
+\title{Physics-Informed Few-step FLow Model}
+\author{Khiem Tran}
+\date{May 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Physics-Informed Few-Step Flow for Single/Coupled PDEs}
+
+We propose a generative PDE solver that combines physics-informed transport with few-step flow matching. Let $x_0 \sim p_0$ is the initial state and $x_1 \sim p_1$ be the state of the physics system at time step $\tau$, which we need to predict.
+
+\paragraph{Physics-informed transport path.}
+Instead of using the standard linear interpolation between the initial state and the target state, we
+learn a physics-aware transport path. Given \(x_0\sim p_0\) and \(x_1\sim p_{1}\), define
+\begin{align}
+    x_t
+    =
+    \psi_\phi(t,x_0,x_1)
+    =
+    (1-t)x_0 + t x_1
+    + \alpha(t)\phi(t,x_0,x_1),
+    \qquad t\in[0,1],
+\end{align}
+    
+where \(\alpha(0)=\alpha(1)=0\), and \(\alpha(t)=t(1-t)\). This envelope ensures
+that the learned correction does not change the endpoints:
+\begin{align}
+    \psi_\phi(0,x_0,x_1)=x_0,
+    \qquad
+    \psi_\phi(1,x_0,x_1)=x_1.
+\end{align}
+
+The corresponding path velocity is
+\begin{align}
+    \dot x_t
+    =
+    \partial_t \psi_\phi(t,x_0,x_1) = (x_1 - x_0) + \dot{\alpha}(t)\phi(t,x_0,x_1) + \alpha(t)\partial_{t} \phi(t, x_0, x_1) .
+\end{align}
+
+We introduce the physics residual penalty as $\mathcal{R}(x_t)$, that measure the violation of physics constraints at state $x_t$. Therefore, we use a weighted physics loss
+\begin{align}
+    \mathcal L_{\rm phy}(\phi)
+    =
+    \mathbb E_{t,x_0,x_1}
+    \left[
+        w(t)\cdot\,
+        \|\mathcal R(x_t)\|_2^2
+    \right],
+\end{align}
+
+where \(w(t)= w_0 + t \alpha\) increases toward \(t=1\). 
+We further regularize the path-induced velocity field. Let
+\begin{align}
+     u_\phi(x,t)
+    =
+    \mathbb E\left[
+        \partial_t\psi_\phi(t,x_0,x_1)
+        \mid
+        \psi_\phi(t,x_0,x_1)=x
+    \right]
+\end{align}
+
+
+be the marginal velocity field induced by the path. We penalize its spatial
+roughness:
+\begin{align}
+    \mathcal L_{\rm sm}(\phi)
+    =
+    \int_0^1
+    \mathbb E_{x_t}
+    \left[
+        \|\nabla_x u_\phi(x_t,t)\|_2^2
+    \right]dt.
+\end{align}
+    
+
+The path is trained by
+\begin{align}
+     \mathcal L_{\rm path}(\phi)
+    =
+    \mathcal L_{\rm phy}(\phi)
+    +
+    \lambda_{\rm sm}\mathcal L_{\rm sm}(\phi),
+\end{align}
+   
+
+\section{Few-step flow model parameterization}
+
+\paragraph{Few-step flow parameterization.}
+After learning the path, we train a few-step flow map model~\citep{boffi2025flow}.  The model predicts the flow map from time \(s\) to \(t\):
+\begin{equation}
+    X_{s,t}(x_s) = x_t = x_s + (t-s) v_{\theta}(x_s, s, t)
+\end{equation}
+When \(s = t\), the shortcut $v_{\theta}(x_s, s,s)$ recovers the instantaneous marginal velocity,
+\begin{equation}
+ v_{\theta}(x_s, s,s) = \frac{d}{ds}(x_s)    
+\end{equation}
+The flow matching loss is therefore
+\begin{equation}
+    \mathcal L_{\rm flow}(\theta)
+    =
+    \mathbb E_{x_t, t \sim U(0,1)}
+    \left[
+        \left\|
+        v_\theta(x_t,t,t)
+        -
+        \partial_t\psi_\phi(t,x_0,x_1)
+        \right\|_2^2
+    \right].
+\end{equation}
+where the path-encoding model $\phi$ is frozen during the flow training process. 
+\paragraph{Self-consistency loss.}
+To enable one-step and few-step generation, we require the shortcut model to be
+self-consistent. We have 
+\begin{equation}
+    \partial_{t} X_{s,t} (x_s) = \frac{d}{dt}(x_t) = v_{\theta}(x_t, t,t)
+\end{equation}
+In other hand, we have 
+\begin{align}
+     \partial_{t} X_{s,t} (x_s) &= \partial_{t} \big( x_s + (t -s)v_\theta(x_s,s,t) \big) \\
+     &= v_{\theta}(x_s, s,t) + \partial_t v_{\theta}(x_s, s,t)
+\end{align}
+
+Therefor the training objective becomes 
+\begin{align}
+    \mathcal{L}_{\text{consist}}(\theta) = \mathbb{E}_{s,t} \Big[ \Big\| v_{\theta}(x_s, s,t) + \partial_t v_{\theta}(x_s, s,t) - \text{sg}(v_{\theta}(x_t, t,t))\Big\|^2_2 \Big]
+\end{align}
+where $\text{sg}$ is the stop gradient operator. 
+\bibliography{references}
+\bibliographystyle{plainnat}
+\end{document}
