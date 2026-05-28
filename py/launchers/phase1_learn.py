@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from common.path_encoding    import initialize_path_encoding
 from common.phase1_loss      import make_phase1_loss, train_step
-from common.physics_residuals import get_residual_fn
+from common.physics_residuals import get_constraint_fn
 
 
 # ---------------------------------------------------------------------------
@@ -117,18 +117,18 @@ def main():
     if args.continue_from:
         phi_params, start_step = load_ckpt(args.continue_from, phi_params)
 
-    # PDE residual
+    # Physics constraint function: R(x_t) = constraint violation at x_t
     pde_cfg = {k: float(v) for k, v in cfg.problem.items()
                if k in ("g", "nu", "kappa")}
-    rhs_fn = get_residual_fn(system, pde_cfg, cfg.problem.H, cfg.problem.W)
+    constraint_fn = get_constraint_fn(system, pde_cfg, cfg.problem.H, cfg.problem.W)
 
-    # Spectral grids (for L_sm)
+    # Spectral grids (for L_sm spatial roughness)
     kx = jnp.array(np.fft.rfftfreq(cfg.problem.W) * cfg.problem.W)
     ky = jnp.array(np.fft.fftfreq(cfg.problem.H) * cfg.problem.H)
     Ky, Kx = jnp.meshgrid(ky, kx, indexing='ij')
 
     loss_fn = make_phase1_loss(
-        path_model, rhs_fn, Ky, Kx,
+        path_model, constraint_fn, Ky, Kx,
         cfg.problem.H, cfg.problem.W,
         w0=cfg.phase1.w0, w_alpha=cfg.phase1.w_alpha,
         lambda_sm=cfg.phase1.lambda_sm,

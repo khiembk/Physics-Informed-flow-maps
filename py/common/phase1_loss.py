@@ -96,7 +96,7 @@ def phase1_loss_single(
     x1: jnp.ndarray,
     t: jnp.ndarray,
     path_model,
-    rhs_fn: Callable,
+    constraint_fn: Callable,
     Ky: jnp.ndarray,
     Kx: jnp.ndarray,
     H: int,
@@ -108,16 +108,24 @@ def phase1_loss_single(
     """
     Compute L_phy + lambda_sm * L_sm for a single (t, x0, x1) triplet.
 
-    Returns (total_loss, metrics_dict).
+    L_phy = w(t) * ||constraint_fn(x_t)||^2
+         = w(t) * ||R(x_t)||^2
+    where R(x_t) measures the VIOLATION OF PHYSICS CONSTRAINTS at state x_t
+    (not a dynamics mismatch):
+      - SW:          relu(-eta_t)          height positivity
+      - NS:          div(u_t)              divergence-free velocity
+      - MHD:         [div(u_t), div(B_t)]  both divergence-free
+      - Multiphase:  simplex + bound viol.  saturation constraints
+
+    L_sm = ||grad_spatial(v_t)||^2   spatial smoothness of path velocity
     """
-    # Path state and velocity via PhysicsInformedPath.velocity
+    # x_t: intermediate state on physics-informed path
+    # v_t: path velocity (needed for L_sm only)
     x_t, v_t = path_model.apply(phi_params, t, x0, x1,
                                   method=path_model.velocity)
 
-    # Physics residual: path velocity should match PDE dynamics
-    rhs = rhs_fn(x_t)                          # PDE predicted velocity at x_t
-    R   = v_t - rhs                            # residual = path_vel - pde_vel
-
+    # Physics loss: constraint violation at intermediate state
+    R     = constraint_fn(x_t)
     w_t   = w0 + w_alpha * t
     L_phy = w_t * jnp.mean(R ** 2)
 
@@ -133,7 +141,7 @@ def phase1_loss_single(
 # Batched loss (vmap over N)
 # ---------------------------------------------------------------------------
 
-def make_phase1_loss(path_model, rhs_fn, Ky, Kx, H, W,
+def make_phase1_loss(path_model, constraint_fn, Ky, Kx, H, W,
                       w0=1.0, w_alpha=1.0, lambda_sm=0.01):
     """
     Returns a batched loss function:
@@ -155,7 +163,7 @@ def make_phase1_loss(path_model, rhs_fn, Ky, Kx, H, W,
         losses, metrics = jax.vmap(
             lambda x0_i, x1_i, t_i: phase1_loss_single(
                 phi_params_arg, x0_i, x1_i, t_i,
-                path_model, rhs_fn, Ky, Kx, H, W,
+                path_model, constraint_fn, Ky, Kx, H, W,
                 w0, w_alpha, lambda_sm,
             )
         )(x0, x1, t)
