@@ -2,14 +2,18 @@
 Phase 1 training: learn physics-informed path encoding phi.
 
 Usage:
+    # Fresh start
     python py/launchers/phase1_learn.py \\
-        --cfg_path    configs.sw_phase1 \\
+        --cfg_path         configs.sw_phase1 \\
         --dataset_location /scratch/user/u.kt348068/physics_informedPDE \\
         --output_folder    /scratch/user/u.kt348068/physics_informedPDE/checkpoints
 
-Trains PhysicsInformedPath(PhiUNet) to minimize:
-    L_path = L_phy + lambda_sm * L_sm
-on the shallow_water_2d dataset.
+    # Resume from checkpoint
+    python py/launchers/phase1_learn.py \\
+        --cfg_path         configs.sw_phase1 \\
+        --dataset_location /scratch/user/u.kt348068/physics_informedPDE \\
+        --output_folder    /scratch/user/u.kt348068/physics_informedPDE/checkpoints \\
+        --continue_from    /scratch/.../checkpoints/phase1_checkpoints/sw/phi_step5000.npz
 """
 
 import argparse
@@ -26,37 +30,51 @@ from jax.flatten_util import ravel_pytree
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from common.path_encoding import setup_path_encoding, initialize_path_encoding
-from common.phase1_loss import make_phase1_loss, train_step
+from common.path_encoding    import initialize_path_encoding
+from common.phase1_loss      import make_phase1_loss, train_step
 from common.physics_residuals import get_residual_fn
 
 
 # ---------------------------------------------------------------------------
-# Data loading
+# Data
 # ---------------------------------------------------------------------------
 
-def load_split(dataset_location: str, system: str, split: str):
+def load_split(dataset_location, system, split):
     path = os.path.join(dataset_location, system, f"{split}.npz")
-    data = np.load(path)
-    return data["x0"].astype(np.float32), data["xT"].astype(np.float32)
+    d = np.load(path)
+    return d["x0"].astype(np.float32), d["xT"].astype(np.float32)
 
 
-def make_iterator(x0s, xTs, bs: int, seed: int = 0):
-    """Infinite iterator yielding batches dict{x0, xT, t}."""
+def make_iterator(x0s, xTs, bs, seed=0):
     N = x0s.shape[0]
     rng = np.random.default_rng(seed)
     idx = np.arange(N)
-
     while True:
         rng.shuffle(idx)
         for start in range(0, N - bs + 1, bs):
-            batch_idx = idx[start:start + bs]
+            b = idx[start:start + bs]
             t = rng.uniform(0.0, 1.0, size=(bs,)).astype(np.float32)
-            yield {
-                "x0": x0s[batch_idx],
-                "xT": xTs[batch_idx],
-                "t":  t,
-            }
+            yield {"x0": x0s[b], "xT": xTs[b], "t": t}
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint helpers
+# ---------------------------------------------------------------------------
+
+def save_ckpt(path, params, step):
+    flat, _ = ravel_pytree(params)
+    np.savez_compressed(path, params=np.array(flat), step=np.array(step))
+    print(f"  [ckpt] saved {path}  (step {step})")
+
+
+def load_ckpt(path, ref_params):
+    """Restore params from NPZ; returns (params, start_step)."""
+    d = np.load(path)
+    flat = jnp.array(d["params"])
+    _, unravel = ravel_pytree(ref_params)
+    step = int(d["step"]) if "step" in d else 0
+    print(f"  [ckpt] loaded {path}  (step {step})")
+    return unravel(flat), step
 
 
 # ---------------------------------------------------------------------------
@@ -68,58 +86,61 @@ def main():
     parser.add_argument("--cfg_path",         required=True)
     parser.add_argument("--dataset_location", required=True)
     parser.add_argument("--output_folder",    required=True)
+    parser.add_argument("--continue_from",    default=None,
+                        help="Path to .npz checkpoint to resume from")
     args = parser.parse_args()
 
-    # Load config
     module = importlib.import_module(args.cfg_path)
     cfg = module.get_config(
         dataset_location=args.dataset_location,
         output_folder=args.output_folder,
     )
 
-    print(f"Devices: {jax.devices()}")
-    print(f"System:  {cfg.problem.system}")
-    print(f"Config:  {args.cfg_path}")
+    print(f"Devices : {jax.devices()}")
+    print(f"System  : {cfg.problem.system}")
+    print(f"Config  : {args.cfg_path}")
 
-    # Data
     system = cfg.problem.system
     x0_train, xT_train = load_split(args.dataset_location, system, "train")
-    x0_test,  xT_test  = load_split(args.dataset_location, system, "test")
-    print(f"Train: {x0_train.shape}   Test: {x0_test.shape}")
+    print(f"Train   : {x0_train.shape}")
 
     train_iter = make_iterator(x0_train, xT_train, cfg.optimization.bs,
                                 seed=cfg.optimization.seed)
 
-    # Model
+    # Model init
     ex_x = jnp.zeros((cfg.problem.C, cfg.problem.H, cfg.problem.W))
     prng = jax.random.PRNGKey(cfg.optimization.seed)
     path_model, phi_params, prng = initialize_path_encoding(cfg, ex_x, prng)
 
-    # PDE residual function
+    # Optionally restore from checkpoint
+    start_step = 0
+    if args.continue_from:
+        phi_params, start_step = load_ckpt(args.continue_from, phi_params)
+
+    # PDE residual
     pde_cfg = {k: float(v) for k, v in cfg.problem.items()
-               if k in ("g", "nu", "kappa", "eta_mhd")}
+               if k in ("g", "nu", "kappa")}
     rhs_fn = get_residual_fn(system, pde_cfg, cfg.problem.H, cfg.problem.W)
 
-    # Spectral grids for L_sm
+    # Spectral grids (for L_sm)
     kx = jnp.array(np.fft.rfftfreq(cfg.problem.W) * cfg.problem.W)
     ky = jnp.array(np.fft.fftfreq(cfg.problem.H) * cfg.problem.H)
     Ky, Kx = jnp.meshgrid(ky, kx, indexing='ij')
 
-    # Loss function
     loss_fn = make_phase1_loss(
         path_model, rhs_fn, Ky, Kx,
         cfg.problem.H, cfg.problem.W,
-        w0=cfg.phase1.w0,
-        w_alpha=cfg.phase1.w_alpha,
+        w0=cfg.phase1.w0, w_alpha=cfg.phase1.w_alpha,
         lambda_sm=cfg.phase1.lambda_sm,
     )
 
-    # Optimizer with warmup + cosine decay
+    # Optimizer
+    total_steps = cfg.optimization.total_steps
     lr_schedule = optax.warmup_cosine_decay_schedule(
         init_value=0.0,
         peak_value=cfg.optimization.learning_rate,
         warmup_steps=cfg.optimization.warmup_steps,
-        decay_steps=cfg.optimization.total_steps,
+        decay_steps=total_steps,
         end_value=cfg.optimization.learning_rate * 0.1,
     )
     optimizer = optax.chain(
@@ -128,32 +149,30 @@ def main():
     )
     opt_state = optimizer.init(phi_params)
 
-    # Output directory
-    os.makedirs(args.output_folder, exist_ok=True)
+    # Checkpoints dir
     ckpt_dir = os.path.join(args.output_folder, "phase1_checkpoints", system)
     os.makedirs(ckpt_dir, exist_ok=True)
 
-    # W&B (optional)
+    # W&B
     try:
         import wandb
-        wandb.init(
-            project=cfg.logging.wandb_project,
-            name=cfg.logging.wandb_name,
-            entity=cfg.logging.wandb_entity,
-            config=cfg.to_dict(),
-        )
+        wandb.init(project=cfg.logging.wandb_project,
+                   name=cfg.logging.wandb_name,
+                   entity=cfg.logging.wandb_entity,
+                   config=cfg.to_dict(),
+                   resume="allow" if args.continue_from else None)
         use_wandb = True
     except Exception:
         use_wandb = False
-        print("W&B not available, logging to stdout only.")
 
-    print(f"\nStarting Phase 1 training for {cfg.optimization.total_steps} steps")
-    print(f"  batch_size={cfg.optimization.bs}  lr={cfg.optimization.learning_rate}"
+    remaining = total_steps - start_step
+    print(f"\nPhase 1: {remaining} steps remaining  "
+          f"(start={start_step}  total={total_steps})")
+    print(f"  bs={cfg.optimization.bs}  lr={cfg.optimization.learning_rate}"
           f"  lambda_sm={cfg.phase1.lambda_sm}")
-    print(f"  L_phy weight: w(t) = {cfg.phase1.w0} + {cfg.phase1.w_alpha}*t")
 
     t0 = time.time()
-    for step in range(1, cfg.optimization.total_steps + 1):
+    for step in range(start_step + 1, total_steps + 1):
         batch = next(train_iter)
         batch_jax = {k: jnp.array(v) for k, v in batch.items()}
 
@@ -162,7 +181,6 @@ def main():
         )
 
         if step % cfg.logging.log_freq == 0:
-            elapsed = time.time() - t0
             lr_val = float(lr_schedule(step))
             log = {
                 "step":    step,
@@ -170,28 +188,21 @@ def main():
                 "L_phy":   float(metrics["L_phy"]),
                 "L_sm":    float(metrics["L_sm"]),
                 "lr":      lr_val,
-                "elapsed": elapsed,
+                "elapsed": time.time() - t0,
             }
             print(f"  step {step:6d} | loss={log['loss']:.4e}"
                   f"  L_phy={log['L_phy']:.4e}"
                   f"  L_sm={log['L_sm']:.4e}"
                   f"  lr={lr_val:.2e}"
-                  f"  {elapsed:.0f}s")
+                  f"  {log['elapsed']:.0f}s")
             if use_wandb:
                 wandb.log(log, step=step)
 
         if step % cfg.logging.save_freq == 0:
-            ckpt_path = os.path.join(ckpt_dir, f"phi_step{step}.npz")
-            flat, _ = ravel_pytree(phi_params)
-            np.savez_compressed(ckpt_path, params=np.array(flat))
-            print(f"  Checkpoint saved: {ckpt_path}")
+            save_ckpt(os.path.join(ckpt_dir, f"phi_step{step}.npz"),
+                      phi_params, step)
 
-    # Final checkpoint
-    final_path = os.path.join(ckpt_dir, "phi_final.npz")
-    flat, _ = ravel_pytree(phi_params)
-    np.savez_compressed(final_path, params=np.array(flat))
-    print(f"\nFinal checkpoint: {final_path}")
-
+    save_ckpt(os.path.join(ckpt_dir, "phi_final.npz"), phi_params, total_steps)
     if use_wandb:
         wandb.finish()
 
