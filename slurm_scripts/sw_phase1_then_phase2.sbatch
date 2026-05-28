@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=sw_phase2
+#SBATCH --job-name=sw_p1_p2
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -16,7 +16,6 @@ DATA=/scratch/user/u.kt348068/physics_informedPDE
 RUNS=/scratch/user/u.kt348068/physics_informedPDE/runs
 CKPT=/scratch/user/u.kt348068/physics_informedPDE/checkpoints
 
-# Phase 1 final checkpoint (500 steps, before L_sm blowup)
 PHI_CKPT=$CKPT/phase1_checkpoints/shallow_water_2d/phi_final.npz
 
 # ── environment ────────────────────────────────────────────────────────────
@@ -33,12 +32,22 @@ echo "Job  : $SLURM_JOB_NAME  ($SLURM_JOB_ID)"
 echo "Node : $SLURMD_NODENAME"
 echo "GPU  : $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
 echo "Time : $(date)"
-echo "Phi  : $PHI_CKPT"
 echo "=============================="
 
-# ── training ───────────────────────────────────────────────────────────────
-# To resume: add --continue_from $RUNS/sw_phase2_pi_path/params_stepXXXX.npz
+# ── Phase 1: 500 steps (early stop before L_sm blowup) ────────────────────
+echo ""
+echo ">>> Phase 1: 500 steps, phi path encoding"
+python py/launchers/phase1_learn.py \
+    --cfg_path         configs.sw_phase1 \
+    --dataset_location $DATA \
+    --output_folder    $CKPT
 
+echo ""
+echo ">>> Phase 1 done. Phi checkpoint: $PHI_CKPT"
+
+# ── Phase 2: 10K steps on physics-informed path ───────────────────────────
+echo ""
+echo ">>> Phase 2: 10K steps, flow map on frozen phi"
 python py/launchers/phase2_learn.py \
     --cfg_path         configs.sw_phase2 \
     --dataset_location $DATA \

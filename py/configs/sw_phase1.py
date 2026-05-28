@@ -49,8 +49,8 @@ def get_config(dataset_location: str = "", output_folder: str = "") -> ml_collec
     config.optimization = ml_collections.ConfigDict()
     config.optimization.bs           = 32        # pairs per step (x0,xT)
     config.optimization.learning_rate = 1e-3
-    config.optimization.total_steps  = 50_000
-    config.optimization.warmup_steps = 1_000
+    config.optimization.total_steps  = 500       # early stop: avoid L_sm blowup
+    config.optimization.warmup_steps = 50
     config.optimization.clip         = 1.0
     config.optimization.seed         = 42
 
@@ -60,7 +60,7 @@ def get_config(dataset_location: str = "", output_folder: str = "") -> ml_collec
     config.logging.wandb_name     = "sw_phase1_unet16"
     config.logging.wandb_entity   = os.getenv("WANDB_ENTITY", "khiembk")
     config.logging.output_folder  = output_folder
-    config.logging.log_freq       = 500
-    config.logging.save_freq      = 5_000
+    config.logging.log_freq       = 50
+    config.logging.save_freq      = 500
 
     return config
