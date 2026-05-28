@@ -161,21 +161,31 @@ class MPConv(nn.Module):
 
         if len(w.shape) == 2:  # linear layer
             return x @ w.T
+        elif w.shape[2] == 1 and w.shape[3] == 1:
+            # 1×1: single einsum, no cuDNN
+            return jnp.einsum('bchw,oc->bohw', x, w[:, :, 0, 0])
         else:
-            # All spatial convolutions: explicit loop over kernel positions.
-            # cuDNN 8.9 backward (value_and_grad) fails on H100 for ALL layouts.
-            # Summing kH*kW einsum ops is mathematically identical and cuDNN-free.
+            # k×k conv via im2col + single einsum.
+            # cuDNN 8.9 backward fails on H100; loop-of-einsums compiles slowly.
+            # im2col extracts all patches at once → ONE einsum → small XLA graph.
             kH, kW = w.shape[2], w.shape[3]
             p = kH // 2
             H, W_in = x.shape[2], x.shape[3]
             x_pad = jnp.pad(x, ((0, 0), (0, 0), (p, p), (p, p)))
-            return sum(
-                jnp.einsum('bchw,oc->bohw',
-                           x_pad[:, :, ki:ki + H, kj:kj + W_in],
-                           w[:, :, ki, kj])
-                for ki in range(kH)
-                for kj in range(kW)
-            )
+
+            # Stack all kH*kW patch slices along a new axis, then merge with C_in.
+            # Shape: (B, C_in, kH*kW, H, W) -> (B, C_in*kH*kW, H, W)
+            patches = jnp.stack(
+                [x_pad[:, :, ki:ki + H, kj:kj + W_in]
+                 for ki in range(kH) for kj in range(kW)],
+                axis=2,
+            ).reshape(x.shape[0], x.shape[1] * kH * kW, H, W_in)
+
+            # Weight: (C_out, C_in, kH, kW) -> (C_out, C_in*kH*kW) same ordering
+            w_flat = w.reshape(w.shape[0], -1)
+
+            # Single einsum replaces kH*kW separate ones → ~9× fewer XLA nodes
+            return jnp.einsum('bchw,oc->bohw', patches, w_flat)
 
 
 class Block(nn.Module):

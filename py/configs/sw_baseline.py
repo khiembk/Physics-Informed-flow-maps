@@ -73,10 +73,10 @@ def get_config(dataset_location: str = "", output_folder: str = "") -> ml_collec
     config.optimization = ml_collections.ConfigDict()
     config.optimization.bs            = 32
     config.optimization.learning_rate = 1e-4
-    config.optimization.total_steps   = 100_000
-    config.optimization.warmup_steps  = 2_000
+    config.optimization.total_steps   = 10_000   # match Phase 2 for fair comparison
+    config.optimization.warmup_steps  = 500
     config.optimization.clip          = 1.0
-    config.optimization.decay_steps   = 80_000
+    config.optimization.decay_steps   = 10_000
     config.optimization.schedule_type = "cosine"
 
     # ----- logging -----
@@ -85,7 +85,7 @@ def get_config(dataset_location: str = "", output_folder: str = "") -> ml_collec
     config.logging.wandb_name     = "sw_baseline_linear"
     config.logging.wandb_entity   = os.getenv("WANDB_ENTITY", "khiembk")
     config.logging.output_folder  = output_folder
-    config.logging.log_freq       = 500
+    config.logging.log_freq       = 200
     config.logging.save_freq      = 10_000
     config.logging.visual_freq    = 5_000
 
