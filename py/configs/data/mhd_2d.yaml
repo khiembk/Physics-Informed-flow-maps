@@ -1,0 +1,12 @@
+system: mhd_2d
+N_train: 1024
+N_test:  256
+H: 64
+W: 64
+nu: 0.001
+eta: 0.001
+T: 0.05
+dt: 0.0005
+grf_alpha: 4.0
+amplitude: 1.0
+seed: 1

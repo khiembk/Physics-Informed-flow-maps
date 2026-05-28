@@ -3,6 +3,7 @@ Code for initializing datasets.
 """
 
 import functools
+import os
 from typing import Callable, Dict
 
 import jax
@@ -10,6 +11,8 @@ import jax.numpy as jnp
 import numpy as np
 import tensorflow as tf
 from ml_collections import config_dict
+
+PDE_TARGETS = {"navier_stokes_2d", "mhd_2d", "multiphase_2d", "shallow_water_2d"}
 
 
 def sample_checkerboard(
@@ -66,6 +69,58 @@ def np_to_tfds(cfg: config_dict.ConfigDict, x1s: np.ndarray) -> tf.data.Dataset:
     )
 
 
+def load_pde_dataset(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
+    """Load a PDE state-to-state dataset from NPZ files.
+
+    Expects <dataset_location>/<target>/train.npz with keys x0, xT of shape
+    [N, C, H, W] (float32).  Yields flat paired samples (x0, xT) batched
+    along axis 0 so the training loop can use both endpoints.
+
+    Returns (cfg, ds, prng_key) where ds yields dicts {"x0": ..., "xT": ...}.
+    """
+    import json
+
+    data_dir = os.path.join(cfg.problem.dataset_location, cfg.problem.target)
+    train_path = os.path.join(data_dir, "train.npz")
+    meta_path  = os.path.join(data_dir, "meta.json")
+
+    data = np.load(train_path)
+    x0s = data["x0"]   # [N, C, H, W]
+    xTs = data["xT"]   # [N, C, H, W]
+
+    # Read meta for rescale estimation
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            meta = json.load(f)
+    else:
+        meta = {}
+
+    # Estimate sigma_data from xT statistics (used for network rescale)
+    rescale_value = float(np.std(xTs))
+    if cfg.problem.gaussian_scale == "adaptive":
+        cfg.network.rescale = rescale_value
+    else:
+        cfg.network.rescale = 1.0
+
+    # Flatten spatial dims: [N, C, H, W] -> [N, C*H*W] so existing
+    # np_to_tfds can batch over N. Training loop must reshape back.
+    N, C, H, W = x0s.shape
+    cfg.problem.d          = C * H * W
+    cfg.problem.image_dims = (C, H, W)
+
+    # Build paired TF dataset yielding {"x0": ..., "xT": ...}
+    ds = (
+        tf.data.Dataset.from_tensor_slices({"x0": x0s, "xT": xTs})
+        .shuffle(min(len(x0s), 10_000), reshuffle_each_iteration=True)
+        .repeat()
+        .batch(cfg.optimization.bs)
+        .prefetch(tf.data.AUTOTUNE)
+        .as_numpy_iterator()
+    )
+
+    return cfg, ds, prng_key
+
+
 def setup_target(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
     """Set up the target density for the system."""
     if cfg.problem.target == "checker":
@@ -80,6 +135,9 @@ def setup_target(cfg: config_dict.ConfigDict, prng_key: jnp.ndarray):
         x1s = sample_rho1(n_samples, key)
         rescale_value = float(np.std(x1s))
         ds = np_to_tfds(cfg, x1s)
+
+    elif cfg.problem.target in PDE_TARGETS:
+        return load_pde_dataset(cfg, prng_key)
 
     else:
         raise ValueError(f"Unknown target density: {cfg.problem.target!r}. "

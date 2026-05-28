@@ -1,0 +1,14 @@
+system: shallow_water_2d
+N_train: 1024
+N_test:  256
+H: 64
+W: 64
+g: 1.0
+nu: 0.002
+T: 0.05
+dt: 0.0005
+eta_mean: 1.0
+eta_amp: 0.1
+mom_amp: 0.0
+grf_alpha: 4.0
+seed: 3
