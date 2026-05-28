@@ -185,20 +185,24 @@ class MPConv(nn.Module):
 
         if len(w.shape) == 2:  # linear layer
             return x @ w.T
-        else:  # conv layer
+        else:
             assert len(w.shape) == 4
-            padding = [
-                (w.shape[-1] // 2, w.shape[-1] // 2),
-                (w.shape[-1] // 2, w.shape[-1] // 2),
-            ]
-
-            return jax.lax.conv_general_dilated(
-                x,
-                w,
-                window_strides=(1, 1),
-                padding=padding,
-                dimension_numbers=("NCHW", "OIHW", "NCHW"),
-            )
+            if w.shape[2] == 1 and w.shape[3] == 1:
+                # 1x1 conv: use einsum to avoid cuDNN NCHW issues on H100
+                # output[b,o,h,w] = sum_c x[b,c,h,w] * w[o,c]
+                return jnp.einsum('bchw,oc->bohw', x, w[:, :, 0, 0])
+            else:
+                padding = [
+                    (w.shape[-1] // 2, w.shape[-1] // 2),
+                    (w.shape[-1] // 2, w.shape[-1] // 2),
+                ]
+                return jax.lax.conv_general_dilated(
+                    x,
+                    w,
+                    window_strides=(1, 1),
+                    padding=padding,
+                    dimension_numbers=("NCHW", "OIHW", "NCHW"),
+                )
 
 
 class Block(nn.Module):
