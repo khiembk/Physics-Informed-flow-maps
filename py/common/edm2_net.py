@@ -71,51 +71,19 @@ def normalize(x: jnp.ndarray, dim: Tuple = None, eps: float = 1e-4):
 
 
 def resample(x: jnp.ndarray, f: List = [1, 1], mode: str = "keep"):
-    """Upsample or downsample tensor with given filter.
+    """Upsample or downsample — pure XLA, zero cuDNN dependency.
 
-    Uses NHWC layout internally to avoid CUDNN_STATUS_INTERNAL_ERROR on H100
-    caused by NCHW depthwise-conv backward kernels in cuDNN 8.9.
+    cuDNN 8.9 backward pass fails on H100 (SM90) for all conv layouts.
+    Down: average-pool 2×2 via reshape+mean (exact 2× downsample).
+    Up:   nearest-neighbour via jnp.repeat (no cuDNN, clean gradient).
     """
     if mode == "keep":
         return x
-
-    f = jnp.array(f, dtype=jnp.float32)
-    assert f.ndim == 1 and len(f) % 2 == 0
-    pad = (len(f) - 1) // 2
-    f = f / jnp.sum(f)
-    f = jnp.outer(f, f)             # (kH, kW)
-    f = f.astype(x.dtype)
-    c = x.shape[1]                  # NCHW channel count
-
-    # NHWC layout: (B, H, W, C)
-    x_nhwc = jnp.transpose(x, (0, 2, 3, 1))
-
-    # Kernel in HWIO format for grouped (depthwise) conv: (kH, kW, 1, C)
-    # feature_group_count=C means each output channel has 1 input channel
-    f_hwio = jnp.tile(f[:, :, jnp.newaxis, jnp.newaxis], (1, 1, 1, c))
-
     if mode == "down":
-        y_nhwc = jax.lax.conv_general_dilated(
-            x_nhwc,
-            f_hwio,
-            window_strides=(2, 2),
-            padding=((pad, pad), (pad, pad)),
-            dimension_numbers=("NHWC", "HWIO", "NHWC"),
-            feature_group_count=c,
-        )
-    else:
-        assert mode == "up"
-        y_nhwc = jax.lax.conv_general_dilated(
-            x_nhwc,
-            f_hwio * 4,
-            lhs_dilation=(2, 2),
-            window_strides=(1, 1),
-            padding=((1, 1), (1, 1)),
-            dimension_numbers=("NHWC", "HWIO", "NHWC"),
-            feature_group_count=c,
-        )
-
-    return jnp.transpose(y_nhwc, (0, 3, 1, 2))  # NHWC -> NCHW
+        N, C, H, W = x.shape
+        return x.reshape(N, C, H // 2, 2, W // 2, 2).mean(axis=(3, 5))
+    # up
+    return jnp.repeat(jnp.repeat(x, 2, axis=-2), 2, axis=-1)
 
 
 def mp_silu(x: jnp.ndarray):
@@ -193,22 +161,21 @@ class MPConv(nn.Module):
 
         if len(w.shape) == 2:  # linear layer
             return x @ w.T
-        elif w.shape[2] == 1 and w.shape[3] == 1:
-            # 1×1 conv: einsum, no cuDNN
-            return jnp.einsum('bchw,oc->bohw', x, w[:, :, 0, 0])
         else:
-            # 3×3 conv: NHWC layout avoids CUDNN_STATUS_INTERNAL_ERROR on H100
-            # (cuDNN 8.9 backward pass fails for NCHW 3×3 on SM90/H100)
-            p = w.shape[-1] // 2
-            x_nhwc = jnp.transpose(x, (0, 2, 3, 1))          # NCHW -> NHWC
-            w_hwio = jnp.transpose(w, (2, 3, 1, 0))           # OIHW -> HWIO
-            y_nhwc = jax.lax.conv_general_dilated(
-                x_nhwc, w_hwio,
-                window_strides=(1, 1),
-                padding=[(p, p), (p, p)],
-                dimension_numbers=("NHWC", "HWIO", "NHWC"),
+            # All spatial convolutions: explicit loop over kernel positions.
+            # cuDNN 8.9 backward (value_and_grad) fails on H100 for ALL layouts.
+            # Summing kH*kW einsum ops is mathematically identical and cuDNN-free.
+            kH, kW = w.shape[2], w.shape[3]
+            p = kH // 2
+            H, W_in = x.shape[2], x.shape[3]
+            x_pad = jnp.pad(x, ((0, 0), (0, 0), (p, p), (p, p)))
+            return sum(
+                jnp.einsum('bchw,oc->bohw',
+                           x_pad[:, :, ki:ki + H, kj:kj + W_in],
+                           w[:, :, ki, kj])
+                for ki in range(kH)
+                for kj in range(kW)
             )
-            return jnp.transpose(y_nhwc, (0, 3, 1, 2))        # NHWC -> NCHW
 
 
 class Block(nn.Module):
