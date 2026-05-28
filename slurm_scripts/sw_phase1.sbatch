@@ -21,6 +21,7 @@ conda activate phyflow
 cd $REPO
 
 export WANDB_ENTITY=khiembk
+export WANDB_MODE=offline        # compute nodes have no internet
 export CUDA_VISIBLE_DEVICES=0
 
 echo "=============================="

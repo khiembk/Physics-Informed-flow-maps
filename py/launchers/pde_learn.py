@@ -89,14 +89,16 @@ def load_ckpt(path, ref_params):
 # Training step: diagonal flow matching, vmapped over batch
 # ---------------------------------------------------------------------------
 
-def make_train_step(net, interp):
+def make_train_step(net, interp, optimizer):
+    """Capture optimizer as a closure so jax.jit never sees it as a traced value."""
+
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0))
     def per_sample(params, x0, x1, t, rng_key):
         return diagonal_term(params, x0, x1, None, t, {"dropout": rng_key},
                              interp=interp, X=net)
 
     @jax.jit
-    def train_step(params, ema_params, opt_state, optimizer, x0, x1, t, rng):
+    def train_step(params, ema_params, opt_state, x0, x1, t, rng):
         keys = jax.random.split(rng, x0.shape[0])
 
         def loss_fn(p):
@@ -176,8 +178,8 @@ def main():
     )
     opt_state = optimizer.init(params)
 
-    # Compile train step
-    train_step = make_train_step(net, interp)
+    # Compile train step (optimizer captured as closure)
+    train_step = make_train_step(net, interp, optimizer)
 
     # Output
     run_dir = os.path.join(args.output_folder, cfg.logging.wandb_name)
@@ -212,7 +214,7 @@ def main():
                                      maxval=cfg.problem.tmax)
 
         params, ema_params, opt_state, loss, grad_norm = train_step(
-            params, ema_params, opt_state, optimizer, x0, xT, t_samp, key_d
+            params, ema_params, opt_state, x0, xT, t_samp, key_d
         )
 
         if step % cfg.logging.log_freq == 0:

@@ -353,16 +353,24 @@ class PhysicsInformedPath(nn.Module):
         x0: jnp.ndarray,
         x1: jnp.ndarray,
         train: bool = False,
+        eps_t: float = 1e-3,
     ) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        """Returns (x_t, dx_t/dt) using jvp for d_phi/dt."""
-        alpha = t * (1.0 - t)
+        """Returns (x_t, dx_t/dt).
+
+        d_phi/dt is approximated with central finite differences to avoid
+        jax.jvp through cuDNN conv kernels (CUDNN_STATUS_INTERNAL_ERROR on H100).
+        Two forward passes; error is O(eps_t^2) ≈ 1e-6.
+        """
+        alpha     = t * (1.0 - t)
         alpha_dot = 1.0 - 2.0 * t
 
-        phi_val, dphi_dt = jax.jvp(
-            lambda t_: self.phi(t_, x0, x1, train=train),
-            primals=(t,),
-            tangents=(jnp.ones_like(t),),
-        )
+        # Central finite difference for dphi/dt
+        t_lo = jnp.clip(t - eps_t, 0.0, 1.0)
+        t_hi = jnp.clip(t + eps_t, 0.0, 1.0)
+        phi_hi = self.phi(t_hi, x0, x1, train=train)
+        phi_lo = self.phi(t_lo, x0, x1, train=train)
+        phi_val = (phi_hi + phi_lo) / 2.0
+        dphi_dt = (phi_hi - phi_lo) / (t_hi - t_lo + 1e-12)
 
         xt = (1.0 - t) * x0 + t * x1 + alpha * phi_val
         vt = (x1 - x0) + alpha_dot * phi_val + alpha * dphi_dt
