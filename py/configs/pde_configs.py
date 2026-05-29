@@ -115,8 +115,8 @@ def get_phase1_config(system: str, dataset_location: str = "",
     config.optimization = ml_collections.ConfigDict()
     config.optimization.bs            = 32
     config.optimization.learning_rate = 1e-3
-    config.optimization.total_steps   = 1_500
-    config.optimization.warmup_steps  = 100
+    config.optimization.total_steps   = 3_000
+    config.optimization.warmup_steps  = 200
     config.optimization.clip          = 1.0
     config.optimization.seed          = 0
 
