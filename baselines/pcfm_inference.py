@@ -98,11 +98,8 @@ def _proj_multiphase(x: jnp.ndarray) -> jnp.ndarray:
 def _proj_euler(x: jnp.ndarray, gamma: float = 1.4) -> jnp.ndarray:
     """Euler [ρ, m_x, m_y, E]: enforce ρ>0 and p>0.
 
-    Projection steps:
-    1. Clip ρ to be positive.
-    2. Compute pressure p = (γ-1)(E - |m|²/2ρ).
-    3. If p < 0: add internal energy to E to make p = ε_p > 0.
-       (minimum-norm adjustment that preserves ρ and m)
+    Minimal adjustment: only modify E where p < 0 to bring it to EPS_P.
+    Keep ρ and m unchanged.
     """
     EPS_RHO = 1e-4
     EPS_P   = 1e-6
@@ -110,12 +107,17 @@ def _proj_euler(x: jnp.ndarray, gamma: float = 1.4) -> jnp.ndarray:
     rho = jnp.maximum(x[0], EPS_RHO)
     mx, my, E = x[1], x[2], x[3]
 
-    p = (gamma - 1.0) * (E - (mx**2 + my**2) / (2.0 * rho))
+    ke   = (mx**2 + my**2) / (2.0 * rho)   # kinetic energy
+    p    = (gamma - 1.0) * (E - ke)
 
-    # Increase E where pressure is negative: E_new = E + (EPS_P - p)/(γ-1)
-    E_adj = jnp.where(p < EPS_P,
-                       E + (EPS_P - p) / (gamma - 1.0),
-                       E)
+    # Minimum internal energy needed for p >= EPS_P
+    e_int_min = EPS_P / (gamma - 1.0)
+    e_int_cur = E - ke
+
+    # Only increase E (never decrease) to maintain p >= EPS_P
+    e_int_adj = jnp.maximum(e_int_cur, e_int_min)
+    E_adj     = ke + e_int_adj
+
     return jnp.stack([rho, mx, my, E_adj])
 
 
