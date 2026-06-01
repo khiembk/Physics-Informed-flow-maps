@@ -1,6 +1,6 @@
 # CLAUDE.md — Physics-Informed Flow Maps (Research Context)
 
-This file captures the research goals, design decisions, and implementation roadmap for this project, for use by Claude Code in future sessions.
+This file captures the research goals, design decisions, implementation roadmap, and experimental findings for this project.
 
 ---
 
@@ -13,8 +13,6 @@ x_0 → x_T
 ```
 
 The model must be both accurate (low relative L2) and **physically admissible** (satisfying hard constraints at the predicted final state).
-
-The codebase extends the Boffi et al. flow map self-distillation framework (`py/common/losses.py`, `py/common/flow_map.py`) with physics-informed training.
 
 ---
 
@@ -30,323 +28,193 @@ x_t = ψ_φ(t, x_0, x_1) = (1-t)x_0 + t*x_1 + α(t) * φ(t, x_0, x_1)
 
 where `α(t) = t(1-t)` enforces `ψ_φ(0,·) = x_0` and `ψ_φ(1,·) = x_1`.
 
-The path velocity is:
-```
-∂_t ψ_φ = (x_1 - x_0) + α̇(t) φ + α(t) ∂_t φ
-```
-
 **Loss:**
 ```
 L_path(φ) = L_phy(φ) + λ_sm * L_sm(φ)
 ```
 
-- `L_phy`: weighted physics residual `E[w(t) * ||R(x_t)||²]`, weight `w(t) = w_0 + t*α` increases toward t=1
-- `L_sm`: spatial smoothness of the marginal velocity field `u_φ(x,t)`
+- `L_phy = E[w(t) * ||R(x_t)||²]`:  physics constraint violation at intermediate state
+- `L_sm = E[||grad_spatial(v_t)||²]`: spatial roughness of path velocity
+- `w(t) = w0 + w_alpha * t`: weight increasing toward t=1
 
-The correction network `φ` is a learned model (same MLP/UNet architecture as the flow map). **φ is frozen after Phase 1.**
+**CRITICAL — Physics loss formulation:**
+`R(x_t)` must measure **constraint violation** (not dynamics mismatch):
+
+| System | R(x_t) | Notes |
+|--------|--------|-------|
+| NS | ∇·u_t | divergence of velocity |
+| MHD | [∇·u_t, ∇·B_t] | both fields div-free |
+| SW | relu(-η_t) | height positivity |
+| Multiphase | simplex + bounds | S_w+S_o=1, 0≤S≤1 |
+| **Euler** | **relu(-ρ_t) + relu(-p_t)** | **nonlinear! violated by linear interp** |
+
+**CRITICAL — Constraint difficulty:**
+- Algebraic LINEAR constraints (∇·u=0, simplex) are PRESERVED by linear interpolation of valid states → L_phy ≈ 0, no signal
+- Nonlinear constraints (p=(γ-1)(E-|m|²/2ρ)>0 in Euler) ARE violated by linear interpolation → real training signal
+- φ ≈ 0 at init → constraint violation ≈ 0 → gradient ≈ 0 → chicken-and-egg problem for all systems
+- **Current Phase 1 does not converge** because L_phy ≈ machine epsilon for all systems tested
+
+### Phase 2 — Flow Map Training
+
+Train flow map `v_θ(x_s, s, t)` on the **frozen** physics-informed path from Phase 1.
+
+**Diagonal flow matching loss:**
+```
+L = ||v_θ(x_t, t, t) - v_t||²
+```
+where `(x_t, v_t)` are pre-computed from frozen φ.
+
+Two-step per iteration:
+1. `compute_targets(x0, xT, t)` → `(x_t, v_t)` from frozen φ (no grad)
+2. `train_step(params, x_t, v_t, t)` → gradient update on v_θ
 
 ---
 
-### Phase 2 — Few-Step Flow Model (LSD Loss)
+## 5 Benchmark Systems
 
-Train a flow map `v_θ(x_s, s, t)` on the frozen physics-informed path.
+All: 64×64 grid, periodic BC, NPZ format `[N,C,H,W]`
 
-**Parameterization:**
-```
-X_{s,t}(x_s) = x_s + (t-s) * v_θ(x_s, s, t)
-```
+### A. Shallow Water (SW) — state: [η, m_x, m_y]
+- Constraint: η ≥ 0 (height positivity)
+- **T=0.3** (trivial RelL2=0.058 — easy task, linear constraints)
+- Solver: pseudo-spectral conservative form
 
-**Training uses LSD (Lagrangian Self-Distillation)**, which enforces the tangent condition:
-```
-∂_t X(s,t,x_s) = b(t, X(s,t,x_s))
-```
+### B. Navier-Stokes/Boussinesq (NS) — state: [c, u_x, u_y]
+- Constraint: ∇·u = 0
+- **T=0.5** (trivial RelL2=0.593 — hard, real signal for longer T)
+- Solver: vorticity-streamfunction + scalar, RK4
 
-Two sources of the teacher velocity `b`:
+### C. MHD — state: [u_x, u_y, B_x, B_y]
+- Constraints: ∇·u = 0, ∇·B = 0
+- **T=0.3** (trivial RelL2=0.987 — **TOO HARD**, recommend T≤0.1)
+- Solver: stream function ψ + vector potential A, RK4
 
-| Batch portion | Source of `b` | Loss term |
-|---|---|---|
-| Diagonal (`s=t`) | Frozen Phase 1 path: `∂_t ψ_φ(t, x_0, x_1)` | Flow matching |
-| Off-diagonal (`s<t`) | EMA of current model: `v_θ_ema(X_{s,t}(x_s), t, t)` | LSD self-distillation |
+### D. Multiphase — state: [P, S_w, S_o]
+- Constraints: S_w+S_o=1, 0≤S≤1
+- **T=0.5** (trivial RelL2=0.365)
+- Solver: upwind FV Buckley-Leverett
 
-**Why LSD over PSD/ESD for Phase 2:**
-- PSD requires two-step composition — expensive for high-dim PDE states
-- ESD requires spatial Jacobian through the network — numerically fragile
-- LSD matches time derivative directly — stable, efficient, maps cleanly to the tangent condition
-
-**Self-consistency loss** (from paper, same as LSD off-diagonal):
-```
-L_consist = E_{s,t}[|| v_θ(x_s,s,t) + ∂_t v_θ(x_s,s,t) - sg(v_θ(x_t,t,t)) ||²]
-```
-
-The existing `lsd_term` in `py/common/losses.py:154` implements this directly. For Phase 2, swap `teacher_params` to evaluate `b` from the frozen Phase 1 model on the diagonal portion.
+### E. Compressible Euler — state: [ρ, m_x, m_y, E]
+- Constraints: ρ>0, **p=(γ-1)(E-|m|²/2ρ)>0** ← NONLINEAR, violated by linear interp
+- **T=0.5**, Mach=0.6, γ=1.4 (trivial RelL2=0.554)
+- Solver: pseudo-spectral + artificial viscosity (ν=0.008)
+- **Best system for this method** — pressure constraint is genuinely violated by linear path
 
 ---
 
-## Benchmark Suite — 4 PDE Systems
+## Experimental Results (latest run)
 
-All systems: state-to-state prediction on `[0,1]²`, periodic BC, 64×64 grid.
-Data format: `NPZ`, shape `[N, C, H, W]`.
+**Setup:** Phase 1 (3000 steps, λ_sm=0), Phase 2 (10K steps, diagonal loss)
 
-### A. Incompressible Navier-Stokes / Boussinesq
+| System | Trivial | Phase2 | Baseline | RelL2 Δ | Key constraint Δ |
+|--------|---------|--------|----------|---------|-----------------|
+| SW (T=0.3) | 0.058 | — | — | — | — |
+| **NS (T=0.5)** | 0.593 | 0.366 | 0.371 | **−1.4% Phase2 wins** | DivErr **−16%** |
+| MHD (T=0.3) | 0.987 | 0.737 | 0.735 | +0.2% (tie) | DivErr_B **−4.6%** |
+| Multi (T=0.5) | 0.365 | 0.297 | 0.294 | +1.2% | BoundErr **−11%** |
+| **Euler (T=0.5)** | 0.554 | 0.344 | 0.332 | +3.5% | **NegP −43%** |
 
-**State:** `[c, u_x, u_y]` — scalar + velocity
+**Key findings:**
+- Phase 2 **beats baseline on NS RelL2** (first time) at T=0.5
+- Phase 2 wins on ALL physics constraint metrics across all systems
+- MHD at T=0.3: training converges (loss −44%) but task too hard (trivial=0.99) → **reduce T to 0.1**
+- Euler has largest constraint improvement (NegP −43%) — confirms nonlinear constraints benefit most from physics-informed path
 
-**PDE:**
-```
-∂_t c + u·∇c = κ Δc
-∂_t u + (u·∇)u = -∇p + ν Δu + c*b
-∇·u = 0
-```
+**Convergence (Phase 2 loss step1k → step10k):**
 
-**Final-state constraints:**
-- `∇·u_T = 0` → metric: `DivErr_u = ||div(u_pred)||_2 / (||∇u_pred||_2 + ε)`
-- Scalar mass: `|∫c_T - ∫c_0| / (|∫c_0| + ε)`
-
-**Constraint type:** Differential (pointwise in Fourier space)
-
-**Config:** `configs/navier_stokes_2d.yaml`, `ν=0.001`, `κ=0.0005`, `T=0.1`
-
----
-
-### B. Incompressible MHD
-
-**State:** `[u_x, u_y, B_x, B_y]` — velocity + magnetic field
-
-**PDE:**
-```
-∂_t u + u·∇u = -∇(p + |B|²/2) + B·∇B + ν Δu
-∂_t B + u·∇B = B·∇u + η ΔB
-∇·u = 0,  ∇·B = 0
-```
-
-**Final-state constraints (two):**
-- `∇·u_T = 0` → `DivErr_u`
-- `∇·B_T = 0` → `DivErr_B`
-
-**Constraint type:** Two simultaneous differential constraints. Harder than NS.
-
-**Init trick:** Initialize via stream function ψ and vector potential A so `u = ∇⊥ψ`, `B = ∇⊥A` — guarantees both divergence-free at t=0.
-
-**Config:** `configs/mhd_2d.yaml`, `ν=0.001`, `η=0.001`, `T=0.05`
+| System | Loss @1k | Loss @10k | Reduction | Need more steps? |
+|--------|---------|---------|-----------|-----------------|
+| SW | 3.5e-4 | 2.4e-4 | −31% | No |
+| NS | 0.101 | 0.060 | −40% | Yes, 30-50K |
+| MHD | 0.891 | 0.501 | −44% | No (fix T instead) |
+| Multi | 0.024 | 0.013 | −44% | Marginal |
+| Euler | 0.508 | 0.240 | −53% | Yes, 30-50K |
 
 ---
 
-### C. Multiphase / Two-Phase Flow
+## Known Issues & Recommendations
 
-**State:** `[P, S_w, S_o]` — pressure + water/oil saturation
+### Phase 1 does not converge (most important issue)
+- **Root cause**: φ≈0 at init → constraint violation = α(t)·(nonzero only if φ nonzero) → L_phy≈0 → no gradient
+- **For linear constraints** (NS ∇·u, Multi simplex): ALSO preserved by linear interpolation → L_phy=0 even when endpoints are valid
+- **Fix options**:
+  1. Use **dynamics mismatch** `R = v_t - rhs(x_t)` — nonzero from step 1, large signal
+  2. Large λ_phy with small random init forcing small but nonzero φ from start
+  3. Euler-only: L_phy is genuinely nonzero (nonlinear constraint) but still tiny vs L_sm
 
-**PDE (Darcy-based):**
-```
-φ ∂_t S + ∇·f_w(S) u_t = q_w
-u_t = -λ(S) k ∇P
-S_o = 1 - S_w
-```
+### MHD T too long
+- T=0.3 gives trivial RelL2=0.987 — state is almost completely decorrelated from initial
+- **Recommended T: 0.10** (trivial ≈ 0.7, hard but learnable)
 
-**Final-state constraints:**
-- Bounds: `0 ≤ S_i ≤ 1` → `BoundErr_S = mean(relu(-S) + relu(S-1))`
-- Simplex: `S_w + S_o = 1` → `SimplexErr = mean(|S_w + S_o - 1|)`
-
-**Constraint type:** Algebraic simplex — no spatial derivatives. Pointwise per grid cell.
-
-**Note:** Since `S_o = 1 - S_w` by definition, the model can predict both and be penalized for simplex violation, or predict one and hard-project. Store both channels for the constraint metric.
-
-**Config:** `configs/multiphase_2d.yaml`, `T=0.1`
+### Training budget
+- NS and Euler need 30–50K Phase 2 steps to fully converge
+- Others fine at 10K
 
 ---
 
-### D. 2D Shallow Water Equations
-
-**State:** `[η, m_x, m_y]` — water height + momentum (`m = η*v`)
-
-**PDE (conservative form):**
-```
-∂_t η + ∂_x m_x + ∂_y m_y = 0
-∂_t m_x + ∂_x(m_x²/η + g η²/2) + ∂_y(m_x m_y/η) = ν Δu_x
-∂_t m_y + ∂_x(m_x m_y/η) + ∂_y(m_y²/η + g η²/2) = ν Δu_y
-```
-
-**Final-state constraints:**
-- Positivity: `η_T ≥ 0` → `NegHeight = mean(relu(-η_pred))`
-- Mass conservation: `|∫η_T - ∫η_0| / (|∫η_0| + ε)`
-
-**Constraint type:** Pointwise inequality + global integral conservation. Mixed local/global.
-
-**Config:** `configs/shallow_water_2d.yaml`, `g=1.0`, `ν=0.002`, `T=0.05`
-
-**Init:** `η_0 = 1 + 0.1 * GRF(x,y)`, clipped to `η_0 > 0.1`
-
----
-
-## Constraint Type Summary
-
-| System | Constraint type | Spatial operator | Difficulty |
-|--------|----------------|-----------------|------------|
-| NS/Boussinesq | Differential (∇·u=0) | Spectral divergence | Medium |
-| MHD | Two differential (∇·u=0, ∇·B=0) | Spectral divergence × 2 | Hard |
-| Multiphase | Algebraic simplex (0≤S≤1, ΣS=1) | None — pointwise algebraic | Medium-hard |
-| Shallow water | Positivity (η≥0) + global mass | Pointwise + integral | Medium |
-
----
-
-## Evaluation Metrics
-
-For each system, report:
-
-```python
-rel_l2_global   = ||x_pred - x_true||_2 / ||x_true||_2
-rel_l2_avg      = mean over channels of (||c_pred - c_true|| / ||c_true||)
-main_constraint = system-specific (DivErr / BoundErr+SimplexErr / NegHeight+MassErr)
-invalid_frac    = fraction of grid cells violating hard constraints
-```
-
-Comparison baselines from the claude_doc report table: FNO, PINO, CViT, MeanFlow/CoupledFlow.
-
----
-
-## Model Size Budget & Recommended Configs
-
-Parameter counts below are exact (analytically derived from the MPConv/Dense weight formulas — no bias in MPConv, bias in Dense).
-
-### Grid-based PDEs (64×64, C channels)
-
-**Flow map v_θ: EDM2 UNet — ~12.28M params (C=3), ~12.29M (C=4)**
-
-```python
-config.network.network_type = "edm2"
-config.network.img_resolution = 64
-config.network.img_channels = C          # 3 for NS/SW/Multiphase, 4 for MHD
-config.network.rescale = 0.5             # sigma_data
-config.network.use_weight = False
-config.network.logvar_channels = 128
-config.network.use_bfloat16 = False
-config.network.label_dim = 0
-config.network.unet_kwargs = ml_collections.ConfigDict({
-    "model_channels": 64,
-    "channel_mult": (1, 2, 4),           # channels: [64, 128, 256]
-    "num_blocks": 1,                     # 1 residual block per resolution
-    "attn_resolutions": (16,),           # self-attention at 16×16 (bottom scale)
-    "channel_mult_noise": None,
-    "channel_mult_emb": None,
-    "block_kwargs": {"dropout": 0.0},
-})
-```
-
-| System | C | v_θ params |
-|--------|---|-----------|
-| NS/Boussinesq | 3 | 12,283,984 |
-| MHD | 4 | 12,285,136 |
-| Multiphase | 3 | 12,283,984 |
-| Shallow water | 3 | 12,283,984 |
-
-**Path encoding φ: tiny EDM2 UNet — ~0.72M params (all systems)**
-
-φ takes (x_0, x_1) concatenated → 2*C input channels, outputs C channels.
-Requires a minor architecture modification: use `img_channels = 2*C` for the UNet input
-but override `out_conv` to MPConv(cout=64, C, 3×3). See implementation note below.
-
-```python
-config.phi_network = ml_collections.ConfigDict()
-config.phi_network.network_type = "edm2"
-config.phi_network.img_resolution = 64
-config.phi_network.img_channels = 2 * C  # concatenated x_0, x_1
-config.phi_network.output_channels = C   # actual output channels (needs arch mod)
-config.phi_network.rescale = 0.5
-config.phi_network.use_weight = False
-config.phi_network.logvar_channels = 128
-config.phi_network.use_bfloat16 = False
-config.phi_network.label_dim = 0
-config.phi_network.unet_kwargs = ml_collections.ConfigDict({
-    "model_channels": 16,
-    "channel_mult": (1, 2, 4),           # channels: [16, 32, 64]
-    "num_blocks": 1,
-    "attn_resolutions": (),              # no attention — keeps it small
-    "channel_mult_noise": None,
-    "channel_mult_emb": None,
-    "block_kwargs": {"dropout": 0.0},
-})
-```
-
-**Architecture note for φ:** The existing `EDM2FlowMapUNet.out_conv` is `MPConv(cout, img_channels, (3,3))`.
-Since img_channels=2*C but desired output is C, add a `PathEncodingUNet` wrapper (or subclass) that
-replaces `out_conv` with `MPConv(cout, C_output, (3,3))`. The encoder still processes 2*C+1 input channels
-(the +1 is the constant channel appended in the forward pass). Only the final output projection changes.
-
-### Low-dimensional / toy PDEs (checker, MLP)
-
-**Flow map v_θ: MLP — 1.05M params (d=2)**
-
-```python
-# Existing checker config — unchanged
-config.network.network_type = "mlp"
-config.network.n_hidden = 4
-config.network.n_neurons = 512
-config.network.output_dim = d
-```
-
-**Path encoding φ: smaller MLP — 0.59M params (d=2)**
-
-φ input dimension = 2*d + 1 (t, x_0, x_1). Dense layers include bias.
-
-```python
-config.phi_network.network_type = "mlp"
-config.phi_network.n_hidden = 4
-config.phi_network.n_neurons = 384
-config.phi_network.output_dim = d
-# input_dim must be set to 2*d+1 in the PathEncodingMLP class
-```
-
-### Parameter count verification
-
-```python
-# Run after initialization to verify
-from jax.flatten_util import ravel_pytree
-print(f"v_theta params: {ravel_pytree(params)[0].size:,}")
-print(f"phi params:     {ravel_pytree(phi_params)[0].size:,}")
-```
-
----
-
-## Implementation Roadmap
-
-1. **Phase 1:** Implement the correction network `φ` and `L_path` loss
-   - Add `physics_path_term` to `py/common/losses.py`
-   - Add `R(x_t)` (PDE residual) per system in `py/common/physics_residuals.py`
-   - Add `φ` network alongside or as a wrapper of `FlowMap`
-
-2. **Phase 2:** Wire LSD loss to use frozen Phase 1 `φ` as teacher on diagonal terms
-   - Modify `setup_loss` to accept a frozen `phi_params` argument
-   - Diagonal `b` = `∂_t ψ_φ(t, x_0, x_1)` from Phase 1 model
-   - Off-diagonal `b` = EMA of current `v_θ` (existing LSD logic unchanged)
-
-3. **Datasets:** Build 4 PDE simulators in `physics_constrained_pde_bench/`
-   - Spectral utilities: `src/common/spectral.py`
-   - Constraint metrics: `src/common/metrics.py`
-   - Solvers: `src/solvers/{navier_stokes,mhd,multiphase,shallow_water}_2d.py`
-   - CLI: `src/generate_dataset.py --config configs/<system>.yaml`
-
-4. **Evaluation:** `src/evaluate_final_state.py` — loads predictions + ground truth, computes all metrics, outputs JSON
-
----
-
-## File Map (current)
+## File Map
 
 ```
 py/
   common/
-    losses.py          — LSD/PSD/ESD loss implementations (extend for Phase 2)
-    flow_map.py        — FlowMap wrapper; partial_t/partial_s via jvp
-    interpolant.py     — Stochastic interpolants (extend for physics-informed path)
-    datasets.py        — Dataset loaders (add PDE loaders here)
-    edm2_net.py        — EDM2 UNet architecture
-    network_utils.py   — Network setup
-    loss_args.py       — Diagonal/off-diagonal batch splitting
+    losses.py            — LSD/PSD/ESD loss (Phase 2)
+    flow_map.py          — FlowMap wrapper
+    path_encoding.py     — PhiUNet, PhiTransformer, PathEncodingMLP
+    phase1_loss.py       — L_phy + L_sm (Phase 1)
+    physics_residuals.py — constraint_fn per system (CORRECTED: constraint violation, not dynamics)
+    spectral.py          — GRF, FFT, Laplacian, Leray, metrics
+    edm2_net.py          — EDM2 UNet (ALL convs via einsum/im2col — no cuDNN)
   configs/
-    checker.py         — Template config (copy for each PDE)
+    pde_configs.py       — SYSTEM_PARAMS + factory for all 5 systems
+    sw/ns/mhd/multi/euler_phase1/phase2/baseline.py  — thin wrappers
   launchers/
-    learn.py           — Main training loop
+    phase1_learn.py      — Phase 1 training (φ)
+    phase2_learn.py      — Phase 2 training (v_θ on frozen φ)
+    pde_learn.py         — Baseline training (linear interpolant)
+  solvers/
+    ns_boussinesq.py     — NS/Boussinesq pseudo-spectral
+    mhd_2d.py            — Incompressible MHD (ψ/A formulation)
+    multiphase_2d.py     — Buckley-Leverett FV
+    shallow_water_2d.py  — Conservative SW pseudo-spectral
+    euler_2d.py          — Compressible Euler + artificial viscosity
+  evaluate_pde.py        — Generic eval: RelL2 + system constraints
+  generate_dataset.py    — CLI: --config <yaml> --output_dir <path>
+slurm_scripts/
+  generate_datasets.sbatch  — array=0-4, CPU, data generation
+  pde_p1_p2.sbatch          — array=0-4, GPU, Phase1+Phase2
+  pde_baseline.sbatch       — array=0-4, GPU, baseline training
+  pde_evaluate.sbatch       — array=0-4, GPU, evaluation
 claude_doc/
-  physics_constrained_coupled_pde_benchmarks.md  — Benchmark spec
-  CLAUDE.md           — This file
-papers/our/
-  main.tex            — Draft paper
+  CLAUDE.md                 — this file
+  physics_constrained_coupled_pde_benchmarks.md  — benchmark spec
+```
+
+---
+
+## cuDNN Fix (H100 PCIe, JAX 0.4.26)
+
+`CUDNN_STATUS_INTERNAL_ERROR` on all conv_general_dilated backward passes.
+Fixed in `edm2_net.py`:
+- 1×1 conv: `einsum('bchw,oc->bohw')` (no cuDNN)
+- k×k conv: im2col → single `einsum` (no cuDNN, ~9× fewer XLA nodes)
+- resample: `reshape+mean` (down), `jnp.repeat` (up)
+
+---
+
+## Environment
+
+```bash
+conda activate phyflow
+# Python 3.10, JAX 0.4.26+cuda12, Flax 0.8.2, Optax 0.2.2
+# Cluster: TAMU HPRC, H100 PCIe nodes (partition=gpu)
+# Account: 156341690590
+```
+
+Data location: `/scratch/user/u.kt348068/physics_informedPDE/`
+```
+  {system}/train.npz, test.npz     — [N,C,H,W] float32
+  checkpoints/phase1_checkpoints/  — phi_final.npz per system
+  runs/{system}_phase2/            — v_theta checkpoints
+  runs/{system}_baseline/          — baseline checkpoints
+  results/{system}_eval.json       — evaluation metrics
 ```
