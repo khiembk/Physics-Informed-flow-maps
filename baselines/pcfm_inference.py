@@ -98,27 +98,33 @@ def _proj_multiphase(x: jnp.ndarray) -> jnp.ndarray:
 def _proj_euler(x: jnp.ndarray, gamma: float = 1.4) -> jnp.ndarray:
     """Euler [ρ, m_x, m_y, E]: enforce ρ>0 and p>0.
 
-    Minimal adjustment: only modify E where p < 0 to bring it to EPS_P.
-    Keep ρ and m unchanged.
+    Strategy:
+    1. Clip ρ to EPS_RHO.
+    2. Rescale momentum so kinetic energy ≤ E - EPS_INT
+       (leaves enough internal energy for p > 0).
+    3. Keep E unchanged.
+
+    When ρ is clipped from negative, ke = m²/(2ρ) explodes.
+    Rescaling m avoids this; it is the minimum-norm fix that preserves ρ,E.
     """
     EPS_RHO = 1e-4
-    EPS_P   = 1e-6
+    EPS_INT = 1e-6   # minimum internal energy = EPS_INT → p_min = (γ-1)*EPS_INT
 
     rho = jnp.maximum(x[0], EPS_RHO)
     mx, my, E = x[1], x[2], x[3]
 
-    ke   = (mx**2 + my**2) / (2.0 * rho)   # kinetic energy
-    p    = (gamma - 1.0) * (E - ke)
+    # Maximum allowed kinetic energy so internal energy ≥ EPS_INT
+    max_ke  = jnp.maximum(E - EPS_INT, 0.0)
+    ke_cur  = (mx**2 + my**2) / (2.0 * rho)
 
-    # Minimum internal energy needed for p >= EPS_P
-    e_int_min = EPS_P / (gamma - 1.0)
-    e_int_cur = E - ke
+    # Scale momentum down if kinetic energy is too large
+    scale   = jnp.where(ke_cur > max_ke,
+                         jnp.sqrt(max_ke / (ke_cur + 1e-30)),
+                         1.0)
+    mx_adj  = mx * scale
+    my_adj  = my * scale
 
-    # Only increase E (never decrease) to maintain p >= EPS_P
-    e_int_adj = jnp.maximum(e_int_cur, e_int_min)
-    E_adj     = ke + e_int_adj
-
-    return jnp.stack([rho, mx, my, E_adj])
+    return jnp.stack([rho, mx_adj, my_adj, E])
 
 
 # ---------------------------------------------------------------------------
