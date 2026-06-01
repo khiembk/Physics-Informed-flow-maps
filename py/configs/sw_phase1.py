@@ -41,7 +41,7 @@ def get_config(dataset_location: str = "", output_folder: str = "") -> ml_collec
     config.phase1 = ml_collections.ConfigDict()
     config.phase1.w0             = 1.0    # base weight w(t) = w0 + w_alpha * t
     config.phase1.w_alpha        = 1.0    # weight ramps to 2.0 at t=1
-    config.phase1.lambda_sm      = 0.01   # spatial roughness coefficient
+    config.phase1.lambda_sm      = 0.0    # physics loss only, no smoothness
     config.phase1.t_min          = 0.0
     config.phase1.t_max          = 1.0
 
