@@ -98,6 +98,21 @@ def compute_constraints(system, x0, xT_pred, eps=1e-8):
                                        (np.abs(eta0.mean((-2,-1))) + eps)).mean())
         metrics["InvalidFrac"] = float((etaT < 0).mean())
 
+    elif system == "euler_2d":
+        rho = xT_pred[:,0]; mx = xT_pred[:,1]; my = xT_pred[:,2]; E = xT_pred[:,3]
+        rho_s = np.maximum(rho, 1e-6)
+        p = (1.4 - 1.0) * (E - (mx**2 + my**2) / (2 * rho_s))
+        metrics["NegRho"]      = float(np.maximum(-rho, 0.0).mean())
+        metrics["NegP"]        = float(np.maximum(-p,   0.0).mean())
+        metrics["InvalidFrac"] = float(((rho < 0) | (p < 0)).mean())
+        # Also check linear interpolant constraint violation
+        rho0 = x0[:,0]; mx0 = x0[:,1]; my0 = x0[:,2]; E0 = x0[:,3]
+        rho_m = 0.5*rho0+0.5*rho; mx_m = 0.5*mx0+0.5*mx
+        my_m  = 0.5*my0+0.5*my;   E_m  = 0.5*E0+0.5*E
+        p_lin = (1.4-1.0)*(E_m - (mx_m**2+my_m**2)/(2*np.maximum(rho_m,1e-6)))
+        metrics["NegP_linear"] = float(np.maximum(-p_lin, 0.0).mean())
+        metrics["FracNeg_linear"] = float((p_lin < 0).mean())
+
     return metrics
 
 

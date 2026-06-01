@@ -3,9 +3,9 @@ N_train: 1024
 N_test:  256
 H: 64
 W: 64
-T: 0.1
+T: 0.5
 dt: 0.001
 grf_alpha_psi: 4.0
 grf_alpha_S: 3.0
-psi_scale: 0.3
+psi_scale: 0.5
 seed: 2

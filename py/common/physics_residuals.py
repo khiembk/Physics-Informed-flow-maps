@@ -110,6 +110,36 @@ def multiphase_constraint(state: jnp.ndarray, **kwargs) -> jnp.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# E. Compressible Euler 2D — state: [rho, m_x, m_y, E]
+# ---------------------------------------------------------------------------
+
+def euler_2d_constraint(state: jnp.ndarray,
+                         gamma: float = 1.4,
+                         **kwargs) -> jnp.ndarray:
+    """
+    Compressible Euler constraints: rho > 0  AND  p > 0.
+
+    p = (gamma-1)(E - |m|^2 / (2*rho))
+
+    R = stack([relu(-rho), relu(-p)])  ->  shape (2, H, W).
+
+    WHY THIS IS GENUINELY NONLINEAR:
+    Both rho_0 > 0 and rho_T > 0 => linear interpolant rho_t > 0 (convex).
+    But p_t = (gamma-1)(E_t - |m_t|^2/(2*rho_t)) can be NEGATIVE for
+    interpolated states even when p_0 > 0 and p_T > 0, because
+    |m_t|^2 / (2*rho_t) is convex in (m,rho) -> Jensen violation.
+    """
+    rho = state[0]
+    mx  = state[1]
+    my  = state[2]
+    E   = state[3]
+    rho_s = jnp.maximum(rho, 1e-6)
+    p     = (gamma - 1.0) * (E - (mx**2 + my**2) / (2.0 * rho_s))
+    return jnp.stack([jnp.maximum(-rho, 0.0),
+                      jnp.maximum(-p,   0.0)])
+
+
+# ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -118,6 +148,7 @@ CONSTRAINT_FNS = {
     "navier_stokes_2d":  ns_boussinesq_constraint,
     "mhd_2d":            mhd_constraint,
     "multiphase_2d":     multiphase_constraint,
+    "euler_2d":          euler_2d_constraint,
 }
 
 
@@ -135,6 +166,10 @@ def get_constraint_fn(system: str, cfg: dict, H: int, W: int):
         Ky = jnp.array(Ky_np)
         Kx = jnp.array(Kx_np)
         return functools.partial(fn, Ky=Ky, Kx=Kx, H=H, W=W)
+
+    if system == "euler_2d":
+        gamma = float(cfg.get("gamma", 1.4))
+        return functools.partial(fn, gamma=gamma)
 
     return fn   # SW and Multiphase need no spectral grids
 

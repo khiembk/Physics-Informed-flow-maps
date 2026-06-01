@@ -33,6 +33,11 @@ SYSTEM_PARAMS = {
         "channels": ["P", "S_w", "S_o"],
         "pde": {},
     },
+    "euler_2d": {
+        "C": 4,
+        "channels": ["rho", "m_x", "m_y", "E"],
+        "pde": {"gamma": 1.4, "nu": 0.005},
+    },
 }
 
 

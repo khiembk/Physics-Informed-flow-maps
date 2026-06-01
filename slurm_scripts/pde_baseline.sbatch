@@ -7,12 +7,12 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
-#SBATCH --array=0-3
+#SBATCH --array=0-4
 #SBATCH --output=logs/%x_%A_%a.out
 #SBATCH --error=logs/%x_%A_%a.err
 
-SYSTEMS=(shallow_water_2d navier_stokes_2d mhd_2d multiphase_2d)
-CFGS=(configs.sw_baseline configs.ns_baseline configs.mhd_baseline configs.multi_baseline)
+SYSTEMS=(shallow_water_2d navier_stokes_2d mhd_2d multiphase_2d euler_2d)
+CFGS=(configs.sw_baseline configs.ns_baseline configs.mhd_baseline configs.multi_baseline configs.euler_baseline)
 
 SYSTEM=${SYSTEMS[$SLURM_ARRAY_TASK_ID]}
 CFG=${CFGS[$SLURM_ARRAY_TASK_ID]}
