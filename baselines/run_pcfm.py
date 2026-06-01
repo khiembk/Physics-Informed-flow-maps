@@ -18,7 +18,10 @@ import numpy as np
 import jax, jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'py'))
+# Add project root and py/ to path regardless of working directory
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)                          # for 'baselines' package
+sys.path.insert(0, os.path.join(_ROOT, 'py'))      # for 'common', 'configs'
 
 from common.flow_map       import initialize_flow_map
 from configs.pde_configs   import get_baseline_config, get_phase2_config, SYSTEM_PARAMS
