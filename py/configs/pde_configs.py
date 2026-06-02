@@ -17,26 +17,31 @@ SYSTEM_PARAMS = {
         "C": 3,
         "channels": ["eta", "m_x", "m_y"],
         "pde": {"g": 1.0, "nu": 0.002},
+        "alpha_dyn": 1.0,    # L_dyn@init~9.5e-3, contribution tiny
     },
     "navier_stokes_2d": {
         "C": 3,
         "channels": ["c", "u_x", "u_y"],
         "pde": {"nu": 0.001, "kappa": 0.0005},
+        "alpha_dyn": 0.05,   # L_dyn@init~2.0  → 0.05*2=0.10
     },
     "mhd_2d": {
         "C": 4,
         "channels": ["u_x", "u_y", "B_x", "B_y"],
         "pde": {"nu": 0.001},
+        "alpha_dyn": 0.001,  # L_dyn@init~118  → 0.001*118=0.12
     },
     "multiphase_2d": {
         "C": 3,
         "channels": ["P", "S_w", "S_o"],
         "pde": {},
+        "alpha_dyn": 0.05,   # L_dyn@init~1.9  → 0.05*1.9=0.10
     },
     "euler_2d": {
         "C": 4,
         "channels": ["rho", "m_x", "m_y", "E"],
         "pde": {"gamma": 1.4, "nu": 0.005},
+        "alpha_dyn": 0.003,  # L_dyn@init~28.7 → 0.003*28.7=0.09
     },
 }
 
@@ -113,8 +118,8 @@ def get_phase1_config(system: str, dataset_location: str = "",
     config.phase1 = ml_collections.ConfigDict()
     config.phase1.w0        = 1.0
     config.phase1.w_alpha   = 1.0
-    config.phase1.lambda_sm = 0.0    # physics loss only, no smoothness
-    config.phase1.alpha_dyn = 1.0    # weight for dynamics mismatch term
+    config.phase1.lambda_sm = 0.0    # no smoothness penalty
+    config.phase1.alpha_dyn = p.get("alpha_dyn", 1.0)  # per-system normalized
     config.phase1.t_min     = 0.0
     config.phase1.t_max     = 1.0
 
