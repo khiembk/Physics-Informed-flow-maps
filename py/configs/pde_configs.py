@@ -114,6 +114,7 @@ def get_phase1_config(system: str, dataset_location: str = "",
     config.phase1.w0        = 1.0
     config.phase1.w_alpha   = 1.0
     config.phase1.lambda_sm = 0.0    # physics loss only, no smoothness
+    config.phase1.alpha_dyn = 1.0    # weight for dynamics mismatch term
     config.phase1.t_min     = 0.0
     config.phase1.t_max     = 1.0
 

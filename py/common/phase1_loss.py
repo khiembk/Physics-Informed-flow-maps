@@ -173,6 +173,88 @@ def make_phase1_loss(path_model, constraint_fn, Ky, Kx, H, W,
 
 
 # ---------------------------------------------------------------------------
+# Phase1-Dynamic: combined constraint + dynamics mismatch loss
+# ---------------------------------------------------------------------------
+
+def phase1_dynamic_loss_single(
+    phi_params: dict,
+    x0: jnp.ndarray,
+    x1: jnp.ndarray,
+    t: jnp.ndarray,
+    path_model,
+    constraint_fn: Callable,
+    rhs_fn: Callable,
+    Ky: jnp.ndarray,
+    Kx: jnp.ndarray,
+    H: int,
+    W: int,
+    w0: float = 1.0,
+    w_alpha: float = 1.0,
+    lambda_sm: float = 0.0,
+    alpha_dyn: float = 1.0,
+) -> Tuple[jnp.ndarray, dict]:
+    """
+    Combined Phase 1 loss: constraint violation + dynamics mismatch.
+
+    L_phy = w(t) * ( ||R_con(x_t)||²  +  alpha_dyn * ||v_t - rhs(x_t)||² )
+
+    R_con = constraint_fn(x_t)  — algebraic constraint violation
+    R_dyn = v_t - rhs_fn(x_t)  — path velocity vs PDE dynamics
+
+    Why combine:
+    - R_con ≈ 0 when phi≈0 (dead gradient problem)
+    - R_dyn is LARGE from step 1 (linear velocity ≠ PDE velocity)
+    - R_dyn provides initial gradient; R_con fine-tunes constraint satisfaction
+    - PDE dynamics implicitly preserve constraints (e.g. NS rhs → div-free)
+    """
+    # Path state and velocity
+    x_t, v_t = path_model.apply(phi_params, t, x0, x1,
+                                  method=path_model.velocity)
+
+    # Constraint violation (small when phi≈0)
+    R_con = constraint_fn(x_t)
+    L_con = jnp.mean(R_con ** 2)
+
+    # Dynamics mismatch (large from step 1)
+    rhs   = rhs_fn(x_t)
+    R_dyn = v_t - rhs
+    L_dyn = jnp.mean(R_dyn ** 2)
+
+    w_t   = w0 + w_alpha * t
+    L_phy = w_t * (L_con + alpha_dyn * L_dyn)
+
+    # Spatial roughness
+    L_sm  = roughness_spatial(v_t, Ky, Kx, H, W)
+
+    total = L_phy + lambda_sm * L_sm
+
+    return total, {
+        "L_phy":   L_phy,
+        "L_con":   L_con,
+        "L_dyn":   L_dyn,
+        "L_sm":    L_sm,
+        "L_total": total,
+    }
+
+
+def make_phase1_dynamic_loss(path_model, constraint_fn, rhs_fn,
+                               Ky, Kx, H, W,
+                               w0=1.0, w_alpha=1.0,
+                               lambda_sm=0.0, alpha_dyn=1.0):
+    """Batched combined loss. Returns loss_fn(phi_params, x0, x1, t)."""
+    def loss_fn(phi_params_arg, x0, x1, t):
+        losses, metrics = jax.vmap(
+            lambda x0_i, x1_i, t_i: phase1_dynamic_loss_single(
+                phi_params_arg, x0_i, x1_i, t_i,
+                path_model, constraint_fn, rhs_fn,
+                Ky, Kx, H, W, w0, w_alpha, lambda_sm, alpha_dyn,
+            )
+        )(x0, x1, t)
+        return jnp.mean(losses), jax.tree_util.tree_map(jnp.mean, metrics)
+    return loss_fn
+
+
+# ---------------------------------------------------------------------------
 # Training step
 # ---------------------------------------------------------------------------
 
